@@ -1,0 +1,39 @@
+{
+  "name": "rendobar-cli",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Rendobar CLI — serverless video processing from your terminal.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rendobar/cli.git"
+  },
+  "homepage": "https://rendobar.com",
+  "bugs": "https://github.com/rendobar/cli/issues",
+  "type": "module",
+  "bin": {
+    "rendobar": "./src/main.ts",
+    "rb": "./src/main.ts"
+  },
+  "scripts": {
+    "dev": "pnpm generate-version && bun run src/main.ts",
+    "generate-version": "node scripts/generate-version.mjs",
+    "build": "pnpm generate-version && bun build --compile --minify src/main.ts --outfile rb",
+    "test": "pnpm generate-version && bun test",
+    "typecheck": "pnpm generate-version && tsc --noEmit"
+  },
+  "dependencies": {
+    "@rendobar/sdk": "^1.0.0",
+    "citty": "^0.1.6",
+    "picocolors": "^1.1.1",
+    "@clack/prompts": "^1.2.0"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.6.0",
+    "@commitlint/config-conventional": "^19.6.0",
+    "@types/bun": "latest",
+    "lefthook": "^1.10.10",
+    "typescript": "^5.9.3"
+  },
+  "packageManager": "pnpm@9.15.0"
+}

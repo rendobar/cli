@@ -77,13 +77,34 @@ Rendobar is a serverless media processing platform — watermark, transcode, cap
 
 ## This repository
 
-This is the **public distribution repository** for the Rendobar CLI. It holds:
+This is the **public source + distribution repository** for the Rendobar CLI. It contains:
 
-- Binary releases (see [Releases](https://github.com/rendobar/cli/releases))
-- README + issue templates
+- Full CLI source (TypeScript, bundled via Bun)
+- Binary releases for macOS, Linux, and Windows (see [Releases](https://github.com/rendobar/cli/releases))
+- Tests, workflows, issue templates
 - License
 
-The CLI **source code** lives in the private Rendobar monorepo. Bug reports and feature requests are welcome — open an issue here.
+Bug reports, feature requests, and pull requests are welcome.
+
+## Contributing
+
+```bash
+git clone https://github.com/rendobar/cli.git
+cd cli
+pnpm install
+pnpm test
+pnpm typecheck
+pnpm dev -- --version
+```
+
+Build a standalone binary locally:
+
+```bash
+pnpm build
+./rb --version
+```
+
+Commit messages must follow [Conventional Commits](https://www.conventionalcommits.org/). Releases and version bumps are automated by [release-please](https://github.com/googleapis/release-please).
 
 ## Support
 

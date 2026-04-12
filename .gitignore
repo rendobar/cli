@@ -1,0 +1,26 @@
+node_modules/
+dist/
+.turbo/
+bun.lockb
+bun.lock
+
+# Build artifacts
+rb
+rb.exe
+*.tar.gz
+*.zip
+
+# Auto-generated
+src/generated/
+
+# Env / local
+.env
+.env.*
+!.env.example
+
+# Editor
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db

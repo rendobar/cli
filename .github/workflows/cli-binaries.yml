@@ -1,0 +1,215 @@
+name: cli-binaries
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: bun-darwin-arm64
+            asset: rb-darwin-arm64
+            ext: .tar.gz
+          - target: bun-darwin-x64
+            asset: rb-darwin-x64
+            ext: .tar.gz
+          - target: bun-linux-x64
+            asset: rb-linux-x64
+            ext: .tar.gz
+          - target: bun-linux-arm64
+            asset: rb-linux-arm64
+            ext: .tar.gz
+          - target: bun-windows-x64
+            asset: rb-windows-x64
+            ext: .zip
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+
+      - uses: oven-sh/setup-bun@4bc047ad259df6fc24a6c9b0f9a0cb08cf17fbe5  # v2.0.1
+        with:
+          bun-version: 1.3.12
+
+      - uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda  # v4.1.0
+
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af  # v4.1.0
+        with:
+          node-version: 20
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830  # v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Generate version file
+        run: node scripts/generate-version.mjs
+
+      - name: Compile binary
+        run: |
+          OUTFILE=rb
+          if [[ "${{ matrix.target }}" == "bun-windows-x64" ]]; then
+            OUTFILE=rb.exe
+          fi
+          bun build --compile --minify \
+            --target=${{ matrix.target }} \
+            --define IS_STANDALONE="true" \
+            --define PLATFORM='"${{ matrix.asset }}"' \
+            src/main.ts \
+            --outfile $OUTFILE
+
+      - name: Archive
+        run: |
+          if [[ "${{ matrix.ext }}" == ".zip" ]]; then
+            zip ${{ matrix.asset }}.zip rb.exe
+          else
+            tar czf ${{ matrix.asset }}.tar.gz rb
+          fi
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@7668571508540a607bdfd90a87a560489fe372eb  # v2.1.0
+        with:
+          subject-path: ${{ matrix.asset }}${{ matrix.ext }}
+
+      - name: Generate SHA256
+        run: shasum -a 256 ${{ matrix.asset }}${{ matrix.ext }} > ${{ matrix.asset }}.sha256
+
+      - uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882  # v4.4.3
+        with:
+          name: ${{ matrix.asset }}
+          path: |
+            ${{ matrix.asset }}${{ matrix.ext }}
+            ${{ matrix.asset }}.sha256
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16  # v4.1.8
+        with:
+          path: dist
+
+      - name: Aggregate checksums
+        run: |
+          cat dist/*/*.sha256 > checksums.txt
+          cat checksums.txt
+
+      - uses: softprops/action-gh-release@e7a8f85e1c67a31e6ed99a94b41bd0b71bbee6b8  # v2.0.9
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Rendobar CLI ${{ github.ref_name }}
+          files: |
+            dist/*/*.tar.gz
+            dist/*/*.zip
+            checksums.txt
+          fail_on_unmatched_files: true
+          generate_release_notes: true
+
+  smoke-test:
+    needs: release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            asset: rb-linux-x64
+            ext: .tar.gz
+            bin: rb
+          - os: macos-latest
+            asset: rb-darwin-arm64
+            ext: .tar.gz
+            bin: rb
+          - os: windows-latest
+            asset: rb-windows-x64
+            ext: .zip
+            bin: rb.exe
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Compute version
+        id: ver
+        shell: bash
+        run: |
+          TAG="${{ github.ref_name }}"
+          VERSION="${TAG#v}"
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Download + verify + exec
+        shell: bash
+        run: |
+          TAG="${{ github.ref_name }}"
+          VERSION="${{ steps.ver.outputs.version }}"
+          ASSET="${{ matrix.asset }}${{ matrix.ext }}"
+          # Retry for CDN propagation
+          for i in 1 2 3 4 5; do
+            sleep $((i * 15))
+            if curl -fsSL -o "$ASSET" "https://github.com/rendobar/cli/releases/download/${TAG}/${ASSET}" && \
+               curl -fsSL -o checksums.txt "https://github.com/rendobar/cli/releases/download/${TAG}/checksums.txt"; then
+              echo "Download succeeded on attempt $i"
+              break
+            fi
+            echo "Download attempt $i failed, retrying..."
+          done
+          # Verify SHA256
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            EXPECTED=$(grep "$ASSET" checksums.txt | awk '{print $1}')
+            ACTUAL=$(powershell -Command "(Get-FileHash -Algorithm SHA256 '$ASSET').Hash.ToLower()")
+            if [[ "$EXPECTED" != "$ACTUAL" ]]; then
+              echo "Checksum mismatch: expected $EXPECTED, got $ACTUAL"
+              exit 1
+            fi
+            powershell -Command "Expand-Archive -Path '$ASSET' -DestinationPath . -Force"
+          else
+            grep "$ASSET" checksums.txt | shasum -a 256 -c
+            tar xzf "$ASSET"
+          fi
+          # macOS: remove quarantine bit
+          if [[ "$RUNNER_OS" == "macOS" ]]; then
+            xattr -d com.apple.quarantine ./${{ matrix.bin }} || true
+          fi
+          # Execute and verify version
+          OUT=$(./${{ matrix.bin }} --version 2>&1)
+          echo "$OUT"
+          if ! echo "$OUT" | grep -q "$VERSION"; then
+            echo "Version mismatch: expected $VERSION, got $OUT"
+            exit 1
+          fi
+
+  rollback:
+    needs: smoke-test
+    if: failure()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+    steps:
+      - name: Mark release prerelease
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release edit "${{ github.ref_name }}" --prerelease --repo ${{ github.repository }} || true
+
+      - name: Open rollback issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue create \
+            --repo ${{ github.repository }} \
+            --title "Binary release failure: ${{ github.ref_name }}" \
+            --body "Binary smoke test failed on one or more platforms. Release marked prerelease. Investigate before unmarking."

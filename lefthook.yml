@@ -1,0 +1,6 @@
+# lefthook.yml — cross-platform git hooks (Go binary, no Node dependency for hook exec)
+# Docs: https://github.com/evilmartians/lefthook
+commit-msg:
+  commands:
+    commitlint:
+      run: npx --no-install commitlint --edit {1}
