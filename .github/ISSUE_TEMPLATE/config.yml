@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation
+    url: https://rendobar.com/docs
+    about: Guides, API reference, examples
+  - name: Website
+    url: https://rendobar.com
+    about: What is Rendobar
