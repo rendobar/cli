@@ -4,7 +4,9 @@
 // Opens a GH issue if drifted by more than a patch version.
 // Runs via .github/workflows/drift-check.yml.
 import { execSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync, unlinkSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 const REPO = process.env.GITHUB_REPOSITORY ?? "rendobar/cli";
 const PACKAGE = "@rendobar/sdk";
@@ -79,10 +81,16 @@ gh pr create
 
 This issue was opened automatically by \`.github/workflows/drift-check.yml\`. It will be closed automatically when the dependency is updated.`;
 
-  gh(
-    `issue create --repo ${REPO} --title "drift-check: ${PACKAGE} behind ${latest}" --body "${body.replace(/"/g, '\\"').replace(/\n/g, "\\n")}" --label dependencies --label automated`,
-  );
-  log(`opened drift issue for ${PACKAGE}: ${current} → ${latest}`);
+  const bodyFile = join(tmpdir(), `drift-check-${Date.now()}-${process.pid}.md`);
+  writeFileSync(bodyFile, body);
+  try {
+    gh(
+      `issue create --repo ${REPO} --title "drift-check: ${PACKAGE} behind ${latest}" --body-file "${bodyFile}" --label dependencies --label automated`,
+    );
+    log(`opened drift issue for ${PACKAGE}: ${current} → ${latest}`);
+  } finally {
+    try { unlinkSync(bodyFile); } catch { /* best-effort */ }
+  }
 }
 
 async function main() {

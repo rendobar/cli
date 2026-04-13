@@ -4,6 +4,9 @@
 // conventional feat/fix/perf types but no open release-please PR.
 // Opens a GH issue if detected. Runs via .github/workflows/watchdog.yml.
 import { execSync } from "node:child_process";
+import { writeFileSync, unlinkSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 const CONVENTIONAL_BUMP = /^(feat|fix|perf|revert)(\([a-z0-9-]+\))?!?:/;
 const REPO = process.env.GITHUB_REPOSITORY ?? "rendobar/cli";
@@ -101,13 +104,19 @@ ${commitLines}
 
 This issue was opened automatically by \`.github/workflows/watchdog.yml\`. Close it once the release PR exists.`;
 
+  // Use --body-file to avoid shell escape bugs on backticks / dollar signs
+  // in commit messages.
+  const bodyFile = join(tmpdir(), `watchdog-${Date.now()}-${process.pid}.md`);
+  writeFileSync(bodyFile, body);
   try {
     gh(
-      `issue create --repo ${REPO} --title "watchdog: silent release skip after ${tag}" --body "${body.replace(/"/g, '\\"').replace(/\n/g, "\\n")}" --label automated`,
+      `issue create --repo ${REPO} --title "watchdog: silent release skip after ${tag}" --body-file "${bodyFile}" --label automated`,
     );
     log(`opened watchdog issue for tag ${tag}`);
   } catch (err) {
     log(`failed to open issue: ${err.message}`);
+  } finally {
+    try { unlinkSync(bodyFile); } catch { /* best-effort */ }
   }
 }
 
