@@ -20,7 +20,10 @@
     "generate-version": "node scripts/generate-version.mjs",
     "build": "pnpm generate-version && bun build --compile --minify src/main.ts --outfile rb",
     "test": "pnpm generate-version && bun test",
-    "typecheck": "pnpm generate-version && tsc --noEmit"
+    "typecheck": "pnpm generate-version && tsc --noEmit",
+    "dev:sdk-local": "node scripts/link-local-sdk.mjs",
+    "dev:sdk-npm": "node scripts/unlink-local-sdk.mjs",
+    "check:no-linked-sdk": "node scripts/check-no-linked-sdk.mjs"
   },
   "dependencies": {
     "@rendobar/sdk": "^1.0.0",

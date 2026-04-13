@@ -4,3 +4,12 @@ commit-msg:
   commands:
     commitlint:
       run: npx --no-install commitlint --edit {1}
+
+pre-commit:
+  commands:
+    no-linked-sdk:
+      run: node scripts/check-no-linked-sdk.mjs
+      fail_text: |
+        @rendobar/sdk is pnpm-linked to a local checkout. Run `pnpm dev:sdk-npm` to restore
+        the npm version before committing. Bypass only if you know what you're doing:
+        lefthook run pre-commit --force
