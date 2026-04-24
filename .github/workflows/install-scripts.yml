@@ -203,6 +203,12 @@ jobs:
           ${{ matrix.shell }} ${{ steps.paths.outputs.uninstall }}
           diff "$RC_BEFORE" "$HOME/.bashrc"
 
+  # Windows is a strategy matrix, but we pass the shell choice through an
+  # env var and reference that in `shell:`. GitHub Actions does NOT allow
+  # `matrix` context directly in the `shell:` attribute at step level —
+  # only `env`, `github`, `inputs`, `needs`, `steps`, `strategy`, `job`,
+  # `runner`, `secrets`, `vars`. So we bounce via env, which matrix CAN
+  # populate at job-level.
   windows:
     name: windows / ${{ matrix.shell }}
     runs-on: windows-latest
@@ -213,6 +219,7 @@ jobs:
         shell: [powershell, pwsh]
     env:
       RENDOBAR_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      SHELL_CHOICE: ${{ matrix.shell }}
     steps:
       - name: Determine source mode
         id: mode
@@ -247,7 +254,7 @@ jobs:
           fi
 
       - name: T1 — install latest
-        shell: ${{ matrix.shell }}
+        shell: ${{ env.SHELL_CHOICE }}
         run: |
           $ErrorActionPreference = "Stop"
           $env:RENDOBAR_INSTALL_DIR = "$env:USERPROFILE\rdbr-t1\bin"
@@ -261,7 +268,7 @@ jobs:
           }
 
       - name: T2 — install pinned
-        shell: ${{ matrix.shell }}
+        shell: ${{ env.SHELL_CHOICE }}
         run: |
           $ErrorActionPreference = "Stop"
           $env:RENDOBAR_INSTALL_DIR = "$env:USERPROFILE\rdbr-t2\bin"
@@ -271,7 +278,7 @@ jobs:
           if ($ver -notmatch "1\.0\.0") { throw "version: $ver" }
 
       - name: T3 — uninstall default keeps config, removes binary + PATH
-        shell: ${{ matrix.shell }}
+        shell: ${{ env.SHELL_CHOICE }}
         run: |
           $ErrorActionPreference = "Stop"
           $env:RENDOBAR_INSTALL_DIR = "$env:USERPROFILE\rdbr-t3\bin"
@@ -289,7 +296,7 @@ jobs:
           if (($userPath -split ';') -contains $env:RENDOBAR_INSTALL_DIR) { throw "PATH not cleaned" }
 
       - name: T4 — purge removes config
-        shell: ${{ matrix.shell }}
+        shell: ${{ env.SHELL_CHOICE }}
         run: |
           $ErrorActionPreference = "Stop"
           $env:RENDOBAR_INSTALL_DIR = "$env:USERPROFILE\rdbr-t4\bin"
@@ -303,7 +310,7 @@ jobs:
           if (Test-Path $env:RENDOBAR_CONFIG_DIR) { throw "config dir still present" }
 
       - name: T5 — idempotent re-uninstall
-        shell: ${{ matrix.shell }}
+        shell: ${{ env.SHELL_CHOICE }}
         run: |
           $ErrorActionPreference = "Stop"
           $env:RENDOBAR_INSTALL_DIR = "$env:USERPROFILE\rdbr-t5\bin"
@@ -312,7 +319,7 @@ jobs:
           & "${{ steps.paths.outputs.uninstall }}"
 
       - name: T6 — NO_MODIFY_PATH leaves user PATH untouched
-        shell: ${{ matrix.shell }}
+        shell: ${{ env.SHELL_CHOICE }}
         run: |
           $ErrorActionPreference = "Stop"
           $env:RENDOBAR_INSTALL_DIR = "$env:USERPROFILE\rdbr-t6\bin"
@@ -325,7 +332,7 @@ jobs:
           if ($before -ne $after) { throw "user PATH modified despite NO_MODIFY_PATH" }
 
       - name: T7 — running-binary install fails with actionable message
-        shell: ${{ matrix.shell }}
+        shell: ${{ env.SHELL_CHOICE }}
         # PR/branch mode only — the live script is static per deploy, so this
         # exercises the exact install.ps1 we want to verify. Skip in cron/release
         # runs since they test the live URL which may not match the branch.
