@@ -84,7 +84,7 @@ case "$OS" in
   darwin*) OS="darwin" ;;
   *)
     echo "Unsupported OS: $OS"
-    echo "Rendobar CLI supports: Linux (x64/arm64), macOS (x64/arm64), Windows (x64 — use install.ps1)"
+    echo "Rendobar CLI supports: Linux (x64/arm64), macOS (x64/arm64), Windows (x64 -- use install.ps1)"
     exit 1
     ;;
 esac
@@ -194,7 +194,7 @@ if [ "$NO_MODIFY_PATH" = "1" ]; then
 else
   case ":$PATH:" in
     *":$INSTALL_DIR:"*)
-      echo "PATH already contains $INSTALL_DIR — ready to use."
+      echo "PATH already contains $INSTALL_DIR -- ready to use."
       ;;
     *)
       SHELL_NAME="$(basename "${SHELL:-sh}")"

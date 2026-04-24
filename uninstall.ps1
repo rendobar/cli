@@ -23,7 +23,7 @@ if (Test-Path $BinPath) {
     Write-Host "Removed $BinPath"
     $removedAny = $true
   } catch {
-    Write-Warning "Failed to remove $BinPath — close any running 'rb' process and retry. Error: $_"
+    Write-Warning "Failed to remove $BinPath -- close any running 'rb' process and retry. Error: $_"
   }
   # Remove bin dir if empty
   if ((Test-Path $InstallDir) -and -not (Get-ChildItem -Path $InstallDir -Force)) {
@@ -50,7 +50,7 @@ if ($NoModifyPath) {
   }
 }
 
-# 3. Config dir (auth tokens) — opt-in via RENDOBAR_PURGE=1
+# 3. Config dir (auth tokens) -- opt-in via RENDOBAR_PURGE=1
 if ($Purge) {
   if (Test-Path $ConfigDir) {
     Remove-Item -Path $ConfigDir -Recurse -Force
@@ -72,5 +72,5 @@ if ($removedAny) {
   Write-Host "Rendobar CLI uninstalled."
   Write-Host "Revoke API keys at https://app.rendobar.com/settings/api-keys if needed."
 } else {
-  Write-Host "Nothing to uninstall — no Rendobar CLI found."
+  Write-Host "Nothing to uninstall -- no Rendobar CLI found."
 }

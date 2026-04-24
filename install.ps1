@@ -8,7 +8,7 @@
 #   $env:RENDOBAR_NO_MODIFY_PATH  if "1", install binary but do not touch user PATH
 $ErrorActionPreference = "Stop"
 
-# Pin TLS 1.2 — Windows PowerShell 5.1 on Server 2019 / older Win10 images
+# Pin TLS 1.2 -- Windows PowerShell 5.1 on Server 2019 / older Win10 images
 # defaults to TLS 1.0/1.1 which GitHub no longer accepts. Without this, the
 # API and release downloads 500 out with an obscure "underlying connection closed" error.
 try {
@@ -122,7 +122,7 @@ try {
     Write-Host "Add this directory to PATH manually: $InstallDir"
   } else {
     # Add to user PATH (persisted) if not already.
-    # Split on ';' and compare exact segments — substring match (-like "*$x*")
+    # Split on ';' and compare exact segments -- substring match (-like "*$x*")
     # would false-positive on directories that contain InstallDir as a prefix.
     $UserPath = [Environment]::GetEnvironmentVariable("Path", "User")
     $UserPathEntries = if ([string]::IsNullOrEmpty($UserPath)) { @() } else { $UserPath -split ';' | Where-Object { $_ -ne '' } }
@@ -140,7 +140,7 @@ try {
     if (($env:Path -split ';') -notcontains $InstallDir) {
       $env:Path = "$env:Path;$InstallDir"
     }
-    Write-Host "Ready to use — try 'rb --version' in this terminal."
+    Write-Host "Ready to use -- try 'rb --version' in this terminal."
   }
 
   Write-Host ""

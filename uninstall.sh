@@ -21,7 +21,7 @@ if [ -f "$INSTALL_DIR/$BIN_NAME" ]; then
   rm -f "$INSTALL_DIR/$BIN_NAME"
   echo "Removed $INSTALL_DIR/$BIN_NAME"
   removed_any=1
-  # rmdir only succeeds if empty — safe no-op when bin dir still has files.
+  # rmdir only succeeds if empty -- safe no-op when bin dir still has files.
   rmdir "$INSTALL_DIR" 2>/dev/null || true
 else
   echo "No binary at $INSTALL_DIR/$BIN_NAME (skipping)"
@@ -52,7 +52,7 @@ else
   done
 fi
 
-# 3. Config dir (auth tokens) — opt-in via RENDOBAR_PURGE=1
+# 3. Config dir (auth tokens) -- opt-in via RENDOBAR_PURGE=1
 if [ "$PURGE" = "1" ]; then
   if [ -d "$CONFIG_DIR" ]; then
     rm -rf "$CONFIG_DIR"
@@ -73,5 +73,5 @@ if [ "$removed_any" = "1" ]; then
   echo "Rendobar CLI uninstalled."
   echo "Revoke API keys at https://app.rendobar.com/settings/api-keys if needed."
 else
-  echo "Nothing to uninstall — no Rendobar CLI found."
+  echo "Nothing to uninstall -- no Rendobar CLI found."
 fi
