@@ -246,12 +246,16 @@ jobs:
         shell: bash
         run: |
           set -eu
+          # Windows: use RUNNER_TEMP (Windows-native path) rather than /tmp.
+          # Git-bash understands /tmp but PowerShell (which runs the test steps)
+          # doesn't, and a cross-shell handoff needs a path both can open.
+          TMP="${RUNNER_TEMP}/rdbr"
+          mkdir -p "$TMP"
           if [ "${{ steps.mode.outputs.mode }}" = "live" ]; then
-            mkdir -p /tmp/rdbr
-            curl -fsSL --retry 3 --retry-delay 2 https://rendobar.com/install.ps1   -o /tmp/rdbr/install.ps1
-            curl -fsSL --retry 3 --retry-delay 2 https://rendobar.com/uninstall.ps1 -o /tmp/rdbr/uninstall.ps1
-            echo "install=/tmp/rdbr/install.ps1"     >> "$GITHUB_OUTPUT"
-            echo "uninstall=/tmp/rdbr/uninstall.ps1" >> "$GITHUB_OUTPUT"
+            curl -fsSL --retry 3 --retry-delay 2 https://rendobar.com/install.ps1   -o "$TMP/install.ps1"
+            curl -fsSL --retry 3 --retry-delay 2 https://rendobar.com/uninstall.ps1 -o "$TMP/uninstall.ps1"
+            echo "install=$TMP/install.ps1"     >> "$GITHUB_OUTPUT"
+            echo "uninstall=$TMP/uninstall.ps1" >> "$GITHUB_OUTPUT"
           else
             echo "install=${GITHUB_WORKSPACE}/install.ps1"     >> "$GITHUB_OUTPUT"
             echo "uninstall=${GITHUB_WORKSPACE}/uninstall.ps1" >> "$GITHUB_OUTPUT"
