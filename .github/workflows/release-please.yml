@@ -21,6 +21,12 @@ jobs:
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+          # PAT required so the tag release-please pushes fires cli-binaries.yml.
+          # Tags pushed by GITHUB_TOKEN do NOT trigger downstream workflows
+          # (GitHub security feature against recursive runs). Without this,
+          # release-please merges the release PR but binaries never build.
+          # Mirror of the pattern in rendobar/rendobar (commit 0df0351).
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
 
       - name: Enable auto-merge on release PR
         if: steps.release.outputs.pr
