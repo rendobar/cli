@@ -2,6 +2,11 @@ name: release-please
 on:
   push:
     branches: [main]
+  # Manual escape hatch for the documented "silent release skip" failure
+  # mode (see .claude/rules/release-please.md). When label drift or a
+  # missed tag stalls release-please, a maintainer can re-fire it here
+  # without pushing a dummy commit to main.
+  workflow_dispatch: {}
 
 permissions:
   contents: write
