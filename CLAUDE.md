@@ -44,18 +44,28 @@ RENDOBAR_MONOREPO=/custom/path/to/monorepo pnpm dev:sdk-local
 
 ## Conventional commits
 
-Every commit on main MUST follow [Conventional Commits](https://www.conventionalcommits.org/). release-please parses them to compute version bumps. Non-conventional commits are silently skipped — the watchdog (`.github/workflows/watchdog.yml`) will open an issue within 6h if this happens.
+Full rules + decision matrix + anti-patterns: **[.claude/rules/conventional-commits.md](.claude/rules/conventional-commits.md)** — read this before any commit.
 
-This repo is single-product: **no commit scope needed**.
+Core rules:
 
-| Commit | Bump |
+- **R1** — `feat:` / `fix:` mean *user-visible* change. Adding infra / tests / CI / docs is **not** a feat or fix.
+- **R2** — If the shipped artifact (binary + install scripts) is byte-identical to the previous release, no release. Pick a non-bumping type (`ci`, `chore`, `docs`, `build`, `refactor`, `test`).
+- **R3** — `install.sh`, `install.ps1`, `uninstall.*` are public API. Functional changes to them bump.
+- **R4** — `!` in the type for breaking changes (`feat!:`), not `BREAKING CHANGE:` in the subject.
+- **R5** — release-please owns tags, `package.json` version, `CHANGELOG.md`, and `.release-please-manifest.json`. Never hand-edit.
+
+Single-product repo — **no commit scope**. `feat:` not `feat(cli):`.
+
+Quick bump table (post-1.0):
+
+| Type | Bump |
 |---|---|
-| `fix: ...` | patch (`1.0.0` → `1.0.1`) |
-| `feat: ...` | minor (`1.0.0` → `1.1.0`) |
-| `feat!: ...` or `BREAKING CHANGE:` footer | major (`1.0.0` → `2.0.0`) |
-| `chore:`, `docs:`, `test:`, `ci:`, `refactor:` | no bump, no CHANGELOG |
+| `feat!:` / `BREAKING CHANGE:` footer | major (`1.x` → `2.0`) |
+| `feat:` | minor (`1.0` → `1.1`) |
+| `fix:`, `perf:`, `revert:` | patch (`1.0.0` → `1.0.1`) |
+| `chore:`, `docs:`, `test:`, `ci:`, `refactor:`, `build:`, `style:` | none |
 
-**Force a specific version:** add `Release-As: 1.2.3` footer to a `chore:` commit.
+**Force a specific version:** add `Release-As: X.Y.Z` footer to a `chore:` commit. Use sparingly — first releases, rebrands, recovering from state drift only.
 
 Examples:
 
