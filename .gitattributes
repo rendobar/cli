@@ -1,0 +1,7 @@
+# Force LF endings on shell scripts — CRLF breaks the shebang on Linux/macOS.
+*.sh text eol=lf
+# PowerShell is CRLF-tolerant, but keep it consistent.
+*.ps1 text eol=lf
+# Workflow YAML must stay LF for GH Actions parsing consistency.
+*.yml text eol=lf
+*.yaml text eol=lf
