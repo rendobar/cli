@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/rendobar/cli/compare/v1.0.0...v1.0.1) (2026-04-24)
+
+
+### Bug Fixes
+
+* use RUNNER_TEMP in install-scripts Windows live-mode path ([#10](https://github.com/rendobar/cli/issues/10)) ([9917b3c](https://github.com/rendobar/cli/commit/9917b3c2a3e5b98ee2a0f3168fba55c99b10e062))
+
 ## 1.0.0 (2026-04-24)
 
 
