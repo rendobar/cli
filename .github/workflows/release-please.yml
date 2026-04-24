@@ -2,6 +2,11 @@ name: release-please
 on:
   push:
     branches: [main]
+  # Manual escape hatch for the documented "silent release skip" failure
+  # mode (see .claude/rules/release-please.md). When label drift or a
+  # missed tag stalls release-please, a maintainer can re-fire it here
+  # without pushing a dummy commit to main.
+  workflow_dispatch: {}
 
 permissions:
   contents: write
@@ -16,6 +21,12 @@ jobs:
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+          # PAT required so the tag release-please pushes fires cli-binaries.yml.
+          # Tags pushed by GITHUB_TOKEN do NOT trigger downstream workflows
+          # (GitHub security feature against recursive runs). Without this,
+          # release-please merges the release PR but binaries never build.
+          # Mirror of the pattern in rendobar/rendobar (commit 0df0351).
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
 
       - name: Enable auto-merge on release PR
         if: steps.release.outputs.pr
