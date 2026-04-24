@@ -25,13 +25,13 @@ The Rendobar CLI ships as a standalone binary for macOS, Linux, and Windows. No 
 ### macOS / Linux
 
 ```bash
-curl -fsSL https://rendobar.com/install.sh | bash
+curl -fsSL https://rendobar.com/install.sh | sh
 ```
 
 ### Windows (PowerShell)
 
 ```powershell
-iwr https://rendobar.com/install.ps1 -useb | iex
+irm https://rendobar.com/install.ps1 | iex
 ```
 
 ### Verify
@@ -40,6 +40,29 @@ iwr https://rendobar.com/install.ps1 -useb | iex
 rb --version
 rb doctor
 ```
+
+### Pin a version
+
+```bash
+RENDOBAR_VERSION=v1.0.0 curl -fsSL https://rendobar.com/install.sh | sh
+```
+```powershell
+$env:RENDOBAR_VERSION='v1.0.0'; irm https://rendobar.com/install.ps1 | iex
+```
+
+### Uninstall
+
+```bash
+curl -fsSL https://rendobar.com/uninstall.sh | sh
+# add RENDOBAR_PURGE=1 to also wipe auth tokens under ~/.rendobar
+```
+```powershell
+irm https://rendobar.com/uninstall.ps1 | iex
+```
+
+### Inspect before running
+
+The install/uninstall scripts are [source-visible in this repo](https://github.com/rendobar/cli/blob/main/install.sh). `rendobar.com/install.sh` redirects here — download and read first if you prefer.
 
 ## Quick start
 

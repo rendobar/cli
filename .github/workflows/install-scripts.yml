@@ -1,0 +1,352 @@
+name: install scripts
+
+# Tests the install/uninstall scripts across a real OS matrix.
+#
+# Source selection:
+#   pull_request       → branch checkout (tests the PR's version pre-merge)
+#   schedule (cron)    → live rendobar.com URLs (catches CF Pages redirect or CDN breakage)
+#   release published  → live rendobar.com URLs (post-release smoke — did the install
+#                        path pick up the new tag and install it correctly?)
+#   workflow_dispatch  → `source` input: branch | live
+on:
+  pull_request:
+    paths:
+      - install.sh
+      - install.ps1
+      - uninstall.sh
+      - uninstall.ps1
+      - .github/workflows/install-scripts.yml
+  schedule:
+    - cron: '17 6 * * *'
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      source:
+        description: Script source to exercise
+        type: choice
+        default: branch
+        options: [branch, live]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: install-scripts-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unix:
+    name: unix / ${{ matrix.os }} / ${{ matrix.shell }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            shell: sh
+          - os: ubuntu-latest
+            shell: dash
+          - os: macos-latest
+            shell: sh
+          # macos-13 (x64 Intel) dropped: GH Actions runner availability is
+          # low and queues block the summary job 5+ min. Install-script arch
+          # detection is a 4-line `uname -m` case (same path as arm64), and
+          # the darwin-x64 binary is already smoke-tested in cli-binaries.yml.
+          # Re-add if we see Intel-Mac-specific install bugs in the wild.
+    env:
+      # Lifts the 60/hr unauthenticated GitHub API rate limit for the
+      # /releases/latest lookup. Most tests pin RENDOBAR_VERSION to skip the
+      # API entirely; this matters primarily for the T1 "install latest" path.
+      RENDOBAR_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Determine source mode
+        id: mode
+        shell: bash
+        run: |
+          case "${{ github.event_name }}" in
+            pull_request)     MODE=branch ;;
+            schedule|release) MODE=live ;;
+            workflow_dispatch) MODE='${{ github.event.inputs.source }}' ;;
+            *) MODE=branch ;;
+          esac
+          echo "mode=$MODE" >> "$GITHUB_OUTPUT"
+          echo "Using source mode: $MODE"
+
+      - name: Checkout (branch mode)
+        if: steps.mode.outputs.mode == 'branch'
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+
+      - name: Resolve script paths
+        id: paths
+        shell: bash
+        run: |
+          set -eu
+          if [ "${{ steps.mode.outputs.mode }}" = "live" ]; then
+            mkdir -p /tmp/rdbr
+            curl -fsSL --retry 3 --retry-delay 2 https://rendobar.com/install.sh   -o /tmp/rdbr/install.sh
+            curl -fsSL --retry 3 --retry-delay 2 https://rendobar.com/uninstall.sh -o /tmp/rdbr/uninstall.sh
+            echo "install=/tmp/rdbr/install.sh"     >> "$GITHUB_OUTPUT"
+            echo "uninstall=/tmp/rdbr/uninstall.sh" >> "$GITHUB_OUTPUT"
+          else
+            echo "install=${GITHUB_WORKSPACE}/install.sh"     >> "$GITHUB_OUTPUT"
+            echo "uninstall=${GITHUB_WORKSPACE}/uninstall.sh" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install dash (if needed)
+        if: matrix.shell == 'dash'
+        run: sudo apt-get update && sudo apt-get install -y dash
+
+      - name: T1 — install latest
+        shell: bash
+        run: |
+          set -eu
+          export RENDOBAR_INSTALL_DIR="$HOME/rdbr-t1/bin"
+          ${{ matrix.shell }} ${{ steps.paths.outputs.install }}
+          test -x "$RENDOBAR_INSTALL_DIR/rb"
+          VER="$("$RENDOBAR_INSTALL_DIR/rb" --version)"
+          echo "rb --version → $VER"
+          # On release trigger, assert the installed version matches the release tag.
+          if [ "${{ github.event_name }}" = "release" ]; then
+            EXPECTED="${{ github.event.release.tag_name }}"
+            EXPECTED_BARE="${EXPECTED#v}"
+            echo "$VER" | grep -q "$EXPECTED_BARE" || { echo "expected $EXPECTED_BARE in '$VER'" >&2; exit 1; }
+          fi
+
+      - name: T2 — install pinned (RENDOBAR_VERSION=v1.0.0)
+        shell: bash
+        run: |
+          set -eu
+          export RENDOBAR_INSTALL_DIR="$HOME/rdbr-t2/bin"
+          export RENDOBAR_VERSION=v1.0.0
+          ${{ matrix.shell }} ${{ steps.paths.outputs.install }}
+          "$RENDOBAR_INSTALL_DIR/rb" --version | grep -q "1.0.0"
+
+      - name: T3 — double install then uninstall cleans fully
+        shell: bash
+        run: |
+          set -eu
+          RC="$HOME/.bashrc"
+          export SHELL=/bin/bash
+          export RENDOBAR_INSTALL_DIR="$HOME/rdbr-t3/bin"
+          export RENDOBAR_CONFIG_DIR="$HOME/rdbr-t3"
+          export RENDOBAR_VERSION=v1.0.0
+          ${{ matrix.shell }} ${{ steps.paths.outputs.install }}
+          ${{ matrix.shell }} ${{ steps.paths.outputs.install }}
+          test -x "$RENDOBAR_INSTALL_DIR/rb"
+          ${{ matrix.shell }} ${{ steps.paths.outputs.uninstall }}
+          test ! -f "$RENDOBAR_INSTALL_DIR/rb"
+          ! grep -q "# Added by Rendobar installer" "$RC"
+
+      - name: T4 — uninstall default keeps config
+        shell: bash
+        run: |
+          set -eu
+          export RENDOBAR_INSTALL_DIR="$HOME/rdbr-t4/bin"
+          export RENDOBAR_CONFIG_DIR="$HOME/rdbr-t4"
+          export RENDOBAR_VERSION=v1.0.0
+          ${{ matrix.shell }} ${{ steps.paths.outputs.install }}
+          echo '{"token":"xyz"}' > "$RENDOBAR_CONFIG_DIR/config.json"
+          ${{ matrix.shell }} ${{ steps.paths.outputs.uninstall }}
+          test ! -f "$RENDOBAR_INSTALL_DIR/rb"
+          test ! -d "$RENDOBAR_INSTALL_DIR"
+          test -f "$RENDOBAR_CONFIG_DIR/config.json"
+
+      - name: T5 — purge wipes config
+        shell: bash
+        run: |
+          set -eu
+          export RENDOBAR_INSTALL_DIR="$HOME/rdbr-t5/bin"
+          export RENDOBAR_CONFIG_DIR="$HOME/rdbr-t5"
+          export RENDOBAR_VERSION=v1.0.0
+          ${{ matrix.shell }} ${{ steps.paths.outputs.install }}
+          echo '{"token":"xyz"}' > "$RENDOBAR_CONFIG_DIR/config.json"
+          RENDOBAR_PURGE=1 ${{ matrix.shell }} ${{ steps.paths.outputs.uninstall }}
+          test ! -d "$RENDOBAR_CONFIG_DIR"
+
+      - name: T6 — idempotent re-uninstall exits 0
+        shell: bash
+        run: |
+          set -eu
+          export RENDOBAR_INSTALL_DIR="$HOME/rdbr-t6/bin"
+          export RENDOBAR_CONFIG_DIR="$HOME/rdbr-t6"
+          ${{ matrix.shell }} ${{ steps.paths.outputs.uninstall }}
+          ${{ matrix.shell }} ${{ steps.paths.outputs.uninstall }}
+
+      - name: T7 — uninstall preserves trailing rc content (awk off-by-one guard)
+        shell: bash
+        run: |
+          set -eu
+          RC="$HOME/.bashrc"
+          export SHELL=/bin/bash
+          export RENDOBAR_INSTALL_DIR="$HOME/rdbr-t7/bin"
+          export RENDOBAR_VERSION=v1.0.0
+          ${{ matrix.shell }} ${{ steps.paths.outputs.install }}
+          echo "export RENDOBAR_T7_CANARY=keepme" >> "$RC"
+          ${{ matrix.shell }} ${{ steps.paths.outputs.uninstall }}
+          grep -q "RENDOBAR_T7_CANARY=keepme" "$RC"
+
+      - name: T8 — RENDOBAR_NO_MODIFY_PATH leaves rc untouched
+        shell: bash
+        run: |
+          set -eu
+          RC_BEFORE="$HOME/.bashrc-snapshot"
+          export SHELL=/bin/bash
+          touch "$HOME/.bashrc"
+          cp "$HOME/.bashrc" "$RC_BEFORE"
+          export RENDOBAR_INSTALL_DIR="$HOME/rdbr-t8/bin"
+          export RENDOBAR_VERSION=v1.0.0
+          export RENDOBAR_NO_MODIFY_PATH=1
+          ${{ matrix.shell }} ${{ steps.paths.outputs.install }}
+          test -x "$RENDOBAR_INSTALL_DIR/rb"
+          diff "$RC_BEFORE" "$HOME/.bashrc"
+          printf '\n# Added by Rendobar installer\nexport PATH="/x:$PATH"\n' >> "$HOME/.bashrc"
+          cp "$HOME/.bashrc" "$RC_BEFORE"
+          ${{ matrix.shell }} ${{ steps.paths.outputs.uninstall }}
+          diff "$RC_BEFORE" "$HOME/.bashrc"
+
+  # GitHub Actions rejects ${{ matrix.X }} (and ${{ env.X }}) inside a
+  # step's `shell:` attribute. Workaround: job-level `defaults.run.shell`
+  # DOES accept matrix context. Steps that don't override inherit it.
+  # Steps that MUST be bash (source-mode detect, path resolution) set
+  # shell: bash explicitly and are immune.
+  windows:
+    name: windows / ${{ matrix.shell }}
+    runs-on: windows-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        shell: [powershell, pwsh]
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
+    env:
+      RENDOBAR_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Determine source mode
+        id: mode
+        shell: bash
+        run: |
+          case "${{ github.event_name }}" in
+            pull_request)     MODE=branch ;;
+            schedule|release) MODE=live ;;
+            workflow_dispatch) MODE='${{ github.event.inputs.source }}' ;;
+            *) MODE=branch ;;
+          esac
+          echo "mode=$MODE" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout (branch mode)
+        if: steps.mode.outputs.mode == 'branch'
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+
+      - name: Resolve script paths
+        id: paths
+        shell: bash
+        run: |
+          set -eu
+          if [ "${{ steps.mode.outputs.mode }}" = "live" ]; then
+            mkdir -p /tmp/rdbr
+            curl -fsSL --retry 3 --retry-delay 2 https://rendobar.com/install.ps1   -o /tmp/rdbr/install.ps1
+            curl -fsSL --retry 3 --retry-delay 2 https://rendobar.com/uninstall.ps1 -o /tmp/rdbr/uninstall.ps1
+            echo "install=/tmp/rdbr/install.ps1"     >> "$GITHUB_OUTPUT"
+            echo "uninstall=/tmp/rdbr/uninstall.ps1" >> "$GITHUB_OUTPUT"
+          else
+            echo "install=${GITHUB_WORKSPACE}/install.ps1"     >> "$GITHUB_OUTPUT"
+            echo "uninstall=${GITHUB_WORKSPACE}/uninstall.ps1" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: T1 — install latest
+        run: |
+          $ErrorActionPreference = "Stop"
+          $env:RENDOBAR_INSTALL_DIR = "$env:USERPROFILE\rdbr-t1\bin"
+          & "${{ steps.paths.outputs.install }}"
+          if (-not (Test-Path "$env:RENDOBAR_INSTALL_DIR\rb.exe")) { throw "binary missing" }
+          $ver = & "$env:RENDOBAR_INSTALL_DIR\rb.exe" --version
+          Write-Host "rb --version -> $ver"
+          if ("${{ github.event_name }}" -eq "release") {
+            $expected = "${{ github.event.release.tag_name }}" -replace '^v',''
+            if ($ver -notmatch [regex]::Escape($expected)) { throw "expected $expected in '$ver'" }
+          }
+
+      - name: T2 — install pinned
+        run: |
+          $ErrorActionPreference = "Stop"
+          $env:RENDOBAR_INSTALL_DIR = "$env:USERPROFILE\rdbr-t2\bin"
+          $env:RENDOBAR_VERSION = "v1.0.0"
+          & "${{ steps.paths.outputs.install }}"
+          $ver = & "$env:RENDOBAR_INSTALL_DIR\rb.exe" --version
+          if ($ver -notmatch "1\.0\.0") { throw "version: $ver" }
+
+      - name: T3 — uninstall default keeps config, removes binary + PATH
+        run: |
+          $ErrorActionPreference = "Stop"
+          $env:RENDOBAR_INSTALL_DIR = "$env:USERPROFILE\rdbr-t3\bin"
+          $env:RENDOBAR_CONFIG_DIR  = "$env:USERPROFILE\rdbr-t3"
+          $env:RENDOBAR_VERSION = "v1.0.0"
+          & "${{ steps.paths.outputs.install }}"
+          New-Item -ItemType Directory -Path $env:RENDOBAR_CONFIG_DIR -Force | Out-Null
+          Set-Content -Path (Join-Path $env:RENDOBAR_CONFIG_DIR "config.json") -Value '{}'
+          $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+          if (($userPath -split ';') -notcontains $env:RENDOBAR_INSTALL_DIR) { throw "PATH not set" }
+          & "${{ steps.paths.outputs.uninstall }}"
+          if (Test-Path "$env:RENDOBAR_INSTALL_DIR\rb.exe") { throw "binary still present" }
+          if (-not (Test-Path (Join-Path $env:RENDOBAR_CONFIG_DIR 'config.json'))) { throw "config removed" }
+          $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+          if (($userPath -split ';') -contains $env:RENDOBAR_INSTALL_DIR) { throw "PATH not cleaned" }
+
+      - name: T4 — purge removes config
+        run: |
+          $ErrorActionPreference = "Stop"
+          $env:RENDOBAR_INSTALL_DIR = "$env:USERPROFILE\rdbr-t4\bin"
+          $env:RENDOBAR_CONFIG_DIR  = "$env:USERPROFILE\rdbr-t4"
+          $env:RENDOBAR_VERSION = "v1.0.0"
+          & "${{ steps.paths.outputs.install }}"
+          New-Item -ItemType Directory -Path $env:RENDOBAR_CONFIG_DIR -Force | Out-Null
+          Set-Content -Path (Join-Path $env:RENDOBAR_CONFIG_DIR "config.json") -Value '{}'
+          $env:RENDOBAR_PURGE = "1"
+          & "${{ steps.paths.outputs.uninstall }}"
+          if (Test-Path $env:RENDOBAR_CONFIG_DIR) { throw "config dir still present" }
+
+      - name: T5 — idempotent re-uninstall
+        run: |
+          $ErrorActionPreference = "Stop"
+          $env:RENDOBAR_INSTALL_DIR = "$env:USERPROFILE\rdbr-t5\bin"
+          $env:RENDOBAR_CONFIG_DIR  = "$env:USERPROFILE\rdbr-t5"
+          & "${{ steps.paths.outputs.uninstall }}"
+          & "${{ steps.paths.outputs.uninstall }}"
+
+      - name: T6 — NO_MODIFY_PATH leaves user PATH untouched
+        run: |
+          $ErrorActionPreference = "Stop"
+          $env:RENDOBAR_INSTALL_DIR = "$env:USERPROFILE\rdbr-t6\bin"
+          $env:RENDOBAR_VERSION = "v1.0.0"
+          $env:RENDOBAR_NO_MODIFY_PATH = "1"
+          $before = [Environment]::GetEnvironmentVariable("Path", "User")
+          & "${{ steps.paths.outputs.install }}"
+          if (-not (Test-Path "$env:RENDOBAR_INSTALL_DIR\rb.exe")) { throw "binary missing" }
+          $after = [Environment]::GetEnvironmentVariable("Path", "User")
+          if ($before -ne $after) { throw "user PATH modified despite NO_MODIFY_PATH" }
+
+      # T7 (running-binary install → actionable error) is covered by local
+      # smoke only. It verified correctly in CI too — install.ps1 did emit
+      # the expected "file is in use" message — but pwsh 7's Write-Error
+      # semantics make it unreliable to distinguish "script errored because
+      # of test design" from "script errored because of the file lock" in
+      # a CI-runnable assertion. Running the test in PS 5.1 works but
+      # deliberately pinning to one shell defeats the matrix purpose.
+      # The install.ps1 catch block is trivial (5 lines, reviewed) so local
+      # coverage is sufficient.
+
+  summary:
+    name: summary
+    runs-on: ubuntu-latest
+    needs: [unix, windows]
+    if: always()
+    steps:
+      - name: Result
+        run: |
+          echo "unix:    ${{ needs.unix.result }}"
+          echo "windows: ${{ needs.windows.result }}"
+          [ "${{ needs.unix.result }}" = "success" ] && [ "${{ needs.windows.result }}" = "success" ]
