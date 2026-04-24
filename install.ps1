@@ -94,21 +94,22 @@ try {
   }
 
   # Move binary into place. If an earlier 'rb.exe' is currently running,
-  # Move-Item fails with "Access to the path is denied". Catch that specific
-  # failure and emit an actionable message instead of a 30-line .NET stack trace.
+  # Move-Item fails with "Access to the path is denied" / "The process
+  # cannot access the file because it is being used by another process".
+  # Catch any failure here and emit a single actionable line instead of
+  # a multi-screen .NET stack trace. Typed catch lists (`catch [T1], [T2]`)
+  # tickle a parser bug in Windows PowerShell 5.1 when the catch body
+  # contains a here-string, so we use a bare catch.
   try {
     Move-Item -Path "$Tmp\$BinName" -Destination "$InstallDir\$BinName" -Force
-  } catch [System.IO.IOException], [System.UnauthorizedAccessException] {
-    Write-Error @"
-Could not write $InstallDir\$BinName — the file is in use.
-
-This usually means an 'rb' process is still running. Close any terminal
-or process using rb and re-run the installer:
-
-  irm https://rendobar.com/install.ps1 | iex
-
-(Underlying error: $($_.Exception.Message))
-"@
+  } catch {
+    Write-Host ""
+    Write-Host "ERROR: Could not write $InstallDir\$BinName." -ForegroundColor Red
+    Write-Host "This usually means an 'rb' process is still running."
+    Write-Host "Close any terminal or process using rb, then re-run the installer:"
+    Write-Host "    irm https://rendobar.com/install.ps1 | iex"
+    Write-Host ""
+    Write-Host "(Underlying error: $($_.Exception.Message))"
     exit 1
   }
 
