@@ -5,7 +5,7 @@
 </p>
 <p align="center">
   <a href="https://rendobar.com">Website</a> •
-  <a href="https://rendobar.com/docs">Docs</a> •
+  <a href="https://rendobar.com/docs/">Docs</a> •
   <a href="https://www.npmjs.com/package/@rendobar/sdk">SDK</a> •
   <a href="https://github.com/rendobar/cli/releases/latest">Latest Release</a>
 </p>
@@ -77,7 +77,7 @@ rb ffmpeg -i input.mp4 -vf "drawtext=text='PREVIEW':fontsize=48:fontcolor=white@
 rb --help
 ```
 
-Full usage: [rendobar.com/docs/cli](https://rendobar.com/docs/cli)
+Full usage: [rendobar.com/docs/cli/](https://rendobar.com/docs/cli/)
 
 ## Auto-update
 
@@ -94,7 +94,7 @@ Self-replaces the binary in-place with checksum verification and automatic rollb
 Rendobar is a serverless media processing platform — watermark, transcode, caption, render videos with one API call. Credit-based billing. MCP-native for AI agents.
 
 - **Website**: https://rendobar.com
-- **Docs**: https://rendobar.com/docs
+- **Docs**: https://rendobar.com/docs/
 - **API**: https://api.rendobar.com
 - **SDK**: [@rendobar/sdk](https://www.npmjs.com/package/@rendobar/sdk) on npm
 
@@ -133,7 +133,7 @@ Commit messages must follow [Conventional Commits](https://www.conventionalcommi
 
 - **Bugs**: [open an issue](https://github.com/rendobar/cli/issues/new?template=bug.md)
 - **Feature requests**: [open an issue](https://github.com/rendobar/cli/issues/new?template=feature.md)
-- **Docs**: https://rendobar.com/docs
+- **Docs**: https://rendobar.com/docs/
 - **Contact**: hello@rendobar.com
 
 ## License

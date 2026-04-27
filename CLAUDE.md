@@ -9,6 +9,69 @@ Guide for agents and humans working on the Rendobar CLI. Companion doc for the m
 - **Release**: conventional commits → release-please → tag → `cli-binaries.yml` builds 5 platform binaries with attestations → GitHub Release
 - **No manual tags, no manual version bumps**
 
+---
+
+## Cross-repo brand consistency
+
+This repo is part of the broader Rendobar platform. The canonical reference
+for brand strings, URLs, OG metadata, robots policy, and title/description
+rules across **every** rendobar repo lives in the apex monorepo at
+`rendobar/rendobar` `.claude/rules/brand-consistency.md`:
+
+https://github.com/rendobar/rendobar/blob/main/.claude/rules/brand-consistency.md
+
+Critical rules embedded here so you don't need to context-switch:
+
+### Canonical brand strings (must match apex)
+
+| Field | Value |
+|---|---|
+| Display name | `Rendobar` |
+| Apex URL | `https://rendobar.com` |
+| Apex page URLs | `https://rendobar.com/<path>/` (always trailing slash) |
+| API URL | `https://api.rendobar.com` |
+| Dashboard URL | `https://app.rendobar.com` |
+| CDN URL | `https://cdn.rendobar.com` |
+| Twitter handle | `@rendobar` |
+
+**Forbidden variants**: `Rendobar.com`, `the Rendobar platform`, `rendobar`
+(lowercase except in URLs / package names), `https://www.rendobar.com`,
+`http://rendobar.com`, apex page links without a trailing slash.
+
+### `package.json description` — em-dash, sentence case
+
+- ✅ `"Rendobar CLI — serverless video processing from your terminal."`
+- ❌ `"Rendobar | CLI Tool"` (pipe, title case)
+- ❌ `"Rendobar CLI - serverless..."` (ASCII hyphen instead of em-dash)
+
+### README + issue templates — trailing slash on apex page links
+
+Apex Astro is configured with `trailingSlash: "always"`. Every link to an
+`https://rendobar.com/<path>` page **must end with `/`**:
+- ✅ `https://rendobar.com/docs/`, `https://rendobar.com/blog/`, `https://rendobar.com/pricing/`
+- ❌ `https://rendobar.com/docs`, `https://rendobar.com/blog`
+
+The apex root (`https://rendobar.com`) and subdomain roots
+(`https://api.rendobar.com`, `https://app.rendobar.com`,
+`https://cdn.rendobar.com`) are file/origin URLs and stay slash-less.
+
+The install scripts at `https://rendobar.com/install.sh` etc. are FILES, not
+pages — they correctly stay slash-less.
+
+### No AI attribution in commits / PRs
+
+Per the user's global rule (also in apex): never add `Co-Authored-By: Claude`,
+`🤖 Generated with [Claude Code]`, or any AI attribution in commit messages or
+PR descriptions. Strip them silently if a template injects them.
+
+### Anti-patterns — never do these
+
+- Use a brand-string variant other than canonical `Rendobar`
+- Use `Rendobar | ...` (pipe) or `Rendobar - ...` (ASCII hyphen) in package.json description
+- Skip the trailing slash on a `https://rendobar.com/<path>` link in README, issue templates, install scripts that print URLs, or workflow files
+- Reference `rendobar.com/blog`, `rendobar.com/pricing`, `rendobar.com/docs` without trailing slash
+- Add a `Co-Authored-By: Claude` or "Generated with [Claude Code]" line in commit messages or PR descriptions
+
 ## Dev loop
 
 ```bash
