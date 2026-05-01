@@ -9,6 +9,8 @@ rb
 rb.exe
 *.tar.gz
 *.zip
+# but keep the demo stub
+!demos/bin/rb
 
 # Auto-generated
 src/generated/

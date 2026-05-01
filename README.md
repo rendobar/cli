@@ -1,3 +1,9 @@
+<p align="center">
+  <a href="https://rendobar.com">
+    <img src="https://cdn.rendobar.com/assets/brand/logo-mark.svg" alt="Rendobar" width="80">
+  </a>
+</p>
+
 <h1 align="center">Rendobar CLI</h1>
 <p align="center">
   <strong>Serverless video processing from your terminal.</strong><br>
@@ -14,6 +20,10 @@
   <img src="https://img.shields.io/github/v/release/rendobar/cli?label=version" alt="Version">
   <img src="https://img.shields.io/github/downloads/rendobar/cli/total?label=downloads" alt="Downloads">
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="License">
+</p>
+
+<p align="center">
+  <img src="demos/out/hero.gif" alt="Rendobar CLI rendering a video in the cloud" width="780">
 </p>
 
 ---

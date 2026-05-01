@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+# Mock `rb` for demo recordings. Emits exact byte-for-byte output of
+# the real CLI's progress renderer (see src/lib/progress.ts) with
+# realistic timings, but performs no network I/O — keeps demos
+# hermetic and reproducible.
+#
+# Only the `ffmpeg` subcommand is wired up — that's all hero.tape uses.
+
+set -e
+
+# ── Palette (matches picocolors output) ───────────────────────────
+GREEN=$'\033[32m'
+RED=$'\033[31m'
+CYAN=$'\033[36m'
+DIM=$'\033[2m'
+BOLD=$'\033[1m'
+RESET=$'\033[0m'
+CLR_LINE=$'\r\033[2K'
+HIDE_CUR=$'\033[?25l'
+SHOW_CUR=$'\033[?25h'
+
+FRAMES=(⠋ ⠙ ⠹ ⠸ ⠼ ⠴ ⠦ ⠧ ⠇ ⠏)
+
+# Render a spinner for $1 ms with label $2 and optional suffix $3.
+spin() {
+  local total_ms=$1 label=$2 suffix=${3:-}
+  local elapsed=0 frame=0 step=80
+  if [ "${SPINNER_INSTANT:-0}" = "1" ]; then return 0; fi
+  printf '%s' "$HIDE_CUR" >&2
+  while [ $elapsed -lt $total_ms ]; do
+    local f=${FRAMES[$((frame % 10))]}
+    printf '%s  %s%s%s %-14s %s%s%s%s' \
+      "$CLR_LINE" "$CYAN" "$f" "$RESET" "$label" "$DIM" "$suffix" "$RESET" "" >&2
+    sleep 0.08
+    elapsed=$((elapsed + step))
+    frame=$((frame + 1))
+  done
+  printf '%s' "$SHOW_CUR" >&2
+}
+
+# Print final ✓ line for a completed step.
+done_line() {
+  local label=$1 ms=$2 suffix=${3:-}
+  local fmt
+  if [ "$ms" -lt 100 ]; then fmt="${ms}ms"
+  elif [ "$ms" -lt 10000 ]; then fmt="$(awk -v m=$ms 'BEGIN{printf "%.1fs", m/1000}')"
+  else fmt="$((ms/1000))s"
+  fi
+  printf '%s  %s✓%s %-14s %s%s%s%s\n' \
+    "$CLR_LINE" "$GREEN" "$RESET" "$label" "$DIM" "$fmt" "$RESET" "$suffix" >&2
+}
+
+step() {
+  local label=$1 ms=$2 suffix=${3:-}
+  spin "$ms" "$label" "$suffix"
+  done_line "$label" "$ms" "$suffix"
+}
+
+cmd_ffmpeg() {
+  printf '\n'
+  step "Uploading"  1100 "  ${DIM}intro.mp4 · 14.2 MB${RESET}"
+  step "Submitting" 320  "  ${DIM}job_8c2f1aa9${RESET}"
+  step "Queued"     780
+  step "Executing"  3400 "  ${DIM}large-2x · 8 vCPU · 16 GB · us-east-1${RESET}"
+  step "Saving"     560  "  ${DIM}intro-1080p.mp4 · 11.7 MB${RESET}"
+
+  printf '\n  %s→%s %sintro-1080p.mp4%s\n' "$GREEN" "$RESET" "$BOLD" "$RESET"
+  printf '    %shttps://app.rendobar.com/jobs/job_8c2f1aa9%s\n\n' "$DIM" "$RESET"
+}
+
+case "${1:-}" in
+  ffmpeg) shift; cmd_ffmpeg "$@" ;;
+  *)
+    printf '%s  ✗%s unknown command: %s\n' "$RED" "$RESET" "${1:-(none)}" >&2
+    exit 2
+    ;;
+esac

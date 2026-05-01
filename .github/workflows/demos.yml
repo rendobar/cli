@@ -1,0 +1,67 @@
+# Regenerate VHS demo recordings.
+#
+# Runs:  push to main, new v* tag, manual dispatch.
+# Output: demos/out/*.{gif,mp4,webm} uploaded as artifact + attached
+# to the GitHub Release on tags.
+
+name: demos
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+    paths:
+      - "demos/**"
+      - ".github/workflows/demos.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write   # release asset upload
+
+jobs:
+  render:
+    name: render demos
+    runs-on: ubuntu-24.04
+    container:
+      image: ghcr.io/charmbracelet/vhs:v0.10.0
+      options: --user root
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+
+      - name: Render hero
+        working-directory: ${{ github.workspace }}
+        run: |
+          chmod +x demos/bin/rb
+          mkdir -p demos/out
+          export PATH="$PWD/demos/bin:$PATH"
+          vhs demos/hero.tape
+          ls -lh demos/out/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882  # v4.4.3
+        with:
+          name: demos-${{ github.sha }}
+          path: demos/out/
+          retention-days: 30
+
+      - name: Bundle for release
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          cd demos/out
+          zip -r ../../demos.zip .
+
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@e7a8f85e1c67a31e6ed99a94b41bd0b71bbee6b8  # v2.0.9
+        with:
+          files: demos.zip
+
+      - name: Drift check (main branch)
+        if: github.ref == 'refs/heads/main'
+        run: |
+          # Demos source the real CLI's progress format. If the stub
+          # diverges from src/lib/progress.ts the GIFs lie. Soft-warn.
+          if ! grep -q '⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏' demos/bin/rb; then
+            echo "::warning::demos/bin/rb spinner frames may have drifted from src/lib/progress.ts"
+          fi
