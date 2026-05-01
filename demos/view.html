@@ -1,0 +1,25 @@
+<!doctype html><html lang=en><head><meta charset=utf-8>
+<title>Rendobar CLI · hero demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;padding:80px 24px 96px;background:#07080a;color:#f7f8f8;
+    font:15px/1.55 Inter,-apple-system,sans-serif;
+    background-image:radial-gradient(900px 500px at 50% -100px,rgb(5 150 105/.10),transparent 60%);
+    background-attachment:fixed;display:flex;flex-direction:column;align-items:center;gap:32px}
+  h1{font-size:38px;font-weight:600;letter-spacing:-.02em;margin:0;
+    background:linear-gradient(180deg,#fff,#d6d7db);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+  p{margin:0;color:#7d7f8c}
+  .demo{background:#1a1a1d;border:1px solid #34353b;border-radius:18px;overflow:hidden;
+    box-shadow:0 1px 0 rgb(255 255 255/.08) inset,0 32px 64px -32px #000d;max-width:1320px;width:100%}
+  .demo img{display:block;width:100%;height:auto}
+  footer{color:#5a5b65;font-size:13px;text-align:center;margin-top:24px}
+  footer code{font-family:"JetBrains Mono",monospace;color:#6ee7b7;background:#101012;
+    padding:2px 8px;border-radius:4px}
+</style></head><body>
+<h1>Rendobar CLI · hero</h1>
+<p>12s loop · 1280×720 · 50fps</p>
+<div class="demo"><img src="out/hero.gif" alt="hero"></div>
+<footer>Source: <code>demos/hero.tape</code> · regenerate with <code>make -C demos</code></footer>
+</body></html>
