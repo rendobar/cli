@@ -24,8 +24,18 @@
  */
 export function shellEscape(arg: string): string {
   if (arg.length === 0) return "''";
-  // The unquoted-safe set: alnum plus characters that have no special meaning
-  // to POSIX shells when unquoted (`@%+=:,./-`). Everything else gets quoted.
-  if (/^[A-Za-z0-9@%+=:,./-]+$/.test(arg)) return arg;
+  // The unquoted-safe set: alnum, underscore, and a small set of punctuation
+  // that has no special meaning to POSIX shells when unquoted. Notable
+  // exclusions and why they MUST be quoted:
+  //   ~  (HOME expansion)
+  //   *  ?  [  ]  (glob patterns)
+  //   {  }  (brace expansion)
+  //   $  `  (parameter / command substitution)
+  //   !  (history expansion in interactive shells)
+  //   #  (start-of-comment)
+  //   space  tab  newline  (word splitting)
+  //   <  >  |  &  ;  (redirection / control)
+  //   '  "  \  (quoting itself)
+  if (/^[A-Za-z0-9_@%+=:,./-]+$/.test(arg)) return arg;
   return "'" + arg.replace(/'/g, "'\\''") + "'";
 }
