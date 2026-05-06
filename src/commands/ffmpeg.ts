@@ -11,6 +11,7 @@ import pc from "picocolors";
 import { createClient, isApiError } from "@rendobar/sdk";
 import { resolveAuth, refreshTokenIfNeeded, getApiBaseUrl } from "../lib/auth.js";
 import { parseFfmpegArgs } from "../lib/parse-ffmpeg-args.js";
+import { shellEscape } from "../lib/shell-escape.js";
 import { uploadLocalFiles } from "../lib/upload.js";
 import { StepRenderer, waitForJob, downloadOutput, type MachineContext } from "../lib/progress.js";
 
@@ -152,7 +153,14 @@ export default defineCommand({
       }
 
       // ── 2. Submit ────────────────────────────────────────
-      const command = "ffmpeg " + rewrittenArgs.join(" ");
+      // POSIX-shell-escape each argv element before joining. The host shell
+      // (PowerShell, bash, cmd.exe) has already stripped one quoting layer
+      // before the CLI sees argv; without escaping, single quotes embedded
+      // in filter expressions get tokenized away on the API side, causing
+      // FFmpeg to mis-parse commas as filter graph separators ("Filter not
+      // found"). The API's command-string parser implements the matching
+      // POSIX rules so this round-trips losslessly.
+      const command = "ffmpeg " + rewrittenArgs.map(shellEscape).join(" ");
 
       const job = await steps.step("Submitting", async () => {
         return client.jobs.create(
