@@ -132,7 +132,7 @@ export default defineCommand({
       try {
         const client = createClient({ apiKey });
         const state = await client.orgs.current();
-        await saveApiKey(apiKey);
+        await saveApiKey(apiKey, undefined, { orgName: state.org.name, plan: state.plan.name });
         process.stderr.write(`  ${pc.green("\u2713")} Verified | ${pc.bold(state.org.name)} | ${state.plan.name} plan\n`);
         process.stderr.write(`  ${pc.dim(`Saved to ${getConfigDir()}/credentials.json`)}\n`);
       } catch (err) {
@@ -277,25 +277,25 @@ export default defineCommand({
       process.exit(2);
     }
 
-    // Save credentials
+    // Verify by fetching org info, then persist credentials + identity together.
     const accessToken = tokenData.access_token as string;
     const refreshToken = typeof tokenData.refresh_token === "string" ? tokenData.refresh_token : undefined;
     const expiresIn = (tokenData.expires_in as number) ?? 3600;
 
-    await saveOAuthCredentials({
-      accessToken,
-      refreshToken,
-      expiresAt: Date.now() + expiresIn * 1000,
-    });
-
-    // Verify by fetching org info
+    let identity: { orgName: string; plan: string } | undefined;
     try {
       const client = createClient({ accessToken, baseUrl });
       const orgState = await client.orgs.current();
+      identity = { orgName: orgState.org.name, plan: orgState.plan.name };
       process.stderr.write(`  ${pc.green("\u2713")} Signed in | ${pc.bold(orgState.org.name)} | ${orgState.plan.name} plan\n`);
     } catch {
       process.stderr.write(`  ${pc.green("\u2713")} Signed in, but couldn't verify org. Run ${pc.bold("rb whoami")} to check.\n`);
     }
+
+    await saveOAuthCredentials(
+      { accessToken, refreshToken, expiresAt: Date.now() + expiresIn * 1000, identity },
+      undefined,
+    );
 
     process.stderr.write(`  ${pc.dim(`Saved to ${getConfigDir()}/credentials.json`)}\n`);
 

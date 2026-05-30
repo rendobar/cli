@@ -14,10 +14,16 @@ export type AuthCredential =
   | { type: "apikey"; apiKey: string }
   | { type: "oauth"; accessToken: string; refreshToken?: string; expiresAt: number };
 
+export interface StoredIdentity {
+  orgName: string;
+  plan: string;
+}
+
 interface OAuthSaveData {
   accessToken: string;
   refreshToken?: string;
   expiresAt: number;
+  identity?: StoredIdentity;
 }
 
 // ── Config directory ─────────────────────────────────────────
@@ -75,6 +81,22 @@ export function resolveAuth(configDir?: string): AuthCredential | null {
   }
 }
 
+export function readStoredIdentity(configDir?: string): StoredIdentity | null {
+  try {
+    const dir = configDir ?? getConfigDir();
+    const content = fs.readFileSync(`${dir}/${CREDENTIALS_FILE}`, "utf8");
+    const raw: unknown = JSON.parse(content);
+    if (!raw || typeof raw !== "object") return null;
+    const id = (raw as Record<string, unknown>).identity; // safe: narrowed by the typeof object check above
+    if (!id || typeof id !== "object") return null;
+    const { orgName, plan } = id as Record<string, unknown>; // safe: narrowed by the typeof object check above
+    if (typeof orgName === "string" && typeof plan === "string") return { orgName, plan };
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 // ── Token refresh ────────────────────────────────────────────
 
 export async function refreshTokenIfNeeded(
@@ -115,8 +137,9 @@ export async function refreshTokenIfNeeded(
     expiresAt: Date.now() + (json.expires_in as number) * 1000,
   };
 
+  const preservedIdentity = readStoredIdentity(configDir) ?? undefined;
   await saveOAuthCredentials(
-    { accessToken: newCred.accessToken, refreshToken: newCred.refreshToken, expiresAt: newCred.expiresAt },
+    { accessToken: newCred.accessToken, refreshToken: newCred.refreshToken, expiresAt: newCred.expiresAt, identity: preservedIdentity },
     configDir,
   );
 
@@ -136,6 +159,7 @@ export async function saveOAuthCredentials(data: OAuthSaveData, configDir?: stri
       accessToken: data.accessToken,
       ...(data.refreshToken ? { refreshToken: data.refreshToken } : {}),
       expiresAt: data.expiresAt,
+      ...(data.identity ? { identity: data.identity } : {}),
     },
     null,
     2,
@@ -145,12 +169,12 @@ export async function saveOAuthCredentials(data: OAuthSaveData, configDir?: stri
   try { fs.chmodSync(filePath, 0o600); } catch { /* Windows */ }
 }
 
-export async function saveApiKey(apiKey: string, configDir?: string): Promise<void> {
+export async function saveApiKey(apiKey: string, configDir?: string, identity?: StoredIdentity): Promise<void> {
   const dir = configDir ?? getConfigDir();
   fs.mkdirSync(dir, { recursive: true });
   const filePath = `${dir}/${CREDENTIALS_FILE}`;
   const tmpPath = `${filePath}.tmp`;
-  await Bun.write(tmpPath, JSON.stringify({ apiKey }, null, 2));
+  await Bun.write(tmpPath, JSON.stringify({ apiKey, ...(identity ? { identity } : {}) }, null, 2));
   fs.renameSync(tmpPath, filePath);
   try { fs.chmodSync(filePath, 0o600); } catch { /* Windows */ }
 }

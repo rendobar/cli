@@ -83,8 +83,8 @@ rb login
 # Watermark a video
 rb ffmpeg -i input.mp4 -vf "drawtext=text='PREVIEW':fontsize=48:fontcolor=white@0.5" output.mp4
 
-# Check what the CLI can do
-rb --help
+# Run rb with no args to see the welcome screen and all available commands
+rb
 ```
 
 Full usage: [rendobar.com/docs/cli/](https://rendobar.com/docs/cli/)
