@@ -205,6 +205,12 @@ When asked to add a feature or fix a bug:
 - Use `git commit --no-verify` (blocks hooks; investigate the hook failure instead)
 - Add a commit scope like `feat(cli): ...` (single-product repo, bare `feat:` is correct)
 
+## Adding a subcommand
+
+Add one entry to `COMMANDS` in `src/registry.ts`. That single edit drives citty
+subcommand registration, the unknown-command guard in `src/main.ts`, and the `rb`
+welcome-screen catalog. Update `README.md` and the docs site separately.
+
 ## Gotchas
 
 - **Bun version**: pinned to `1.3.12` in all workflows. Don't bump without testing all 5 platforms.
