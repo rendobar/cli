@@ -146,8 +146,9 @@ BREAKING CHANGE: --output is now --out
 commit `feat: X` on main
    ↓ release-please.yml fires
 release-please opens PR: "chore: release main" with bumped version
-   ↓ auto-merge (when branch protection required checks pass)
-tag v1.X.0 pushed by release-please
+   ↓ release PR auto-merges (PAT, squash) once test+lint pass
+tag v1.X.0 pushed by release-please.yml's Tag step (release-please's own
+   github-release is skipped — see .claude/rules/release-please.md)
    ↓ cli-binaries.yml fires on the v* tag
 5 platform builds + attestations + release + smoke tests
    ↓
