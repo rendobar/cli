@@ -21,8 +21,8 @@ This repo uses [release-please](https://github.com/googleapis/release-please) to
 | `CHANGELOG.md` | release-please (generated from conventional commits) |
 | `package.json` → `version` field | release-please |
 | `.release-please-manifest.json` | release-please |
-| git tags (`v*`) | release-please |
-| GitHub Releases (title, body) | release-please + `cli-binaries.yml` |
+| git tags (`v*`) | `release-please.yml` Tag step (PAT push) — see "How tagging works" below |
+| GitHub Releases (title, body) | `cli-binaries.yml` (on the tag) |
 
 **If you edit any of these by hand, release-please's state diverges and the next release PR will be wrong or fail.**
 
@@ -32,11 +32,37 @@ This repo uses [release-please](https://github.com/googleapis/release-please) to
 commit `feat: X` on main
   ↓ release-please.yml fires
 release-please opens PR: "chore: release main" with version X+1
-  ↓ merge (branch protection requires test + lint green)
-tag vX+1 pushed
-  ↓ cli-binaries.yml fires on tag
+  ↓ auto-merge enabled with the PAT (squash, once test+lint green)
+release PR squash-merges → push to main re-fires release-please.yml
+  ↓ "Tag released version" step: pushes vX+1 (PAT) + labels PR `autorelease: tagged`
+cli-binaries.yml fires on the vX+1 tag
+  ↓
 5 builds → attestations → GH release → 3-OS smoke test
 ```
+
+You merge **only the feature PR**. The release PR auto-merges and tags itself.
+
+## How tagging works (and why release-please does NOT create the release)
+
+`release-please.yml` sets `skip-github-release: true`. release-please therefore
+manages only the version PR, `CHANGELOG.md`, and the manifest — it does **not**
+create the GitHub Release or push the tag itself.
+
+Reason: release-please's github-release step cannot match this single-root-package
+repo's merged release PR. In v16.12.0, `getBranchComponent()` resolves to the
+package name (`rendobar-cli`) while the merged PR branch (`release-please--branches--main`)
+carries no component, so the components mismatch, the release is skipped, and the
+PR is left `autorelease: pending` forever — which then aborts every later run
+(`"untagged, merged release PRs outstanding"`). This is upstream bug
+googleapis/release-please#2214 (open for root paths); `component: ""` does not fix
+it (`"" || getDefaultComponent()` falls back to the package name).
+
+Instead, the **"Tag released version"** step in `release-please.yml` runs after a
+release PR merges: it reads the version from `package.json`, pushes `vX.Y.Z` with
+the PAT (so `cli-binaries.yml` fires), and flips the merged PR to
+`autorelease: tagged` to clear the bookkeeping. The PAT (`RELEASE_PLEASE_TOKEN`) is
+also what enables auto-merge, so the release-PR merge re-triggers the workflow —
+a `GITHUB_TOKEN` merge would fire nothing.
 
 **You merge two PRs per release: the feature PR, then the release-please PR.**
 
