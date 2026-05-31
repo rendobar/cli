@@ -9,6 +9,7 @@ import { spawnSync } from "node:child_process";
 import { defineCommand } from "citty";
 import { VERSION } from "../generated/version.js";
 import { getConfigDir } from "../lib/auth.js";
+import { getBinPath } from "../lib/bin-path.js";
 
 // Compile-time defines from `bun build --compile --define`. In dev mode they're undefined.
 declare const IS_STANDALONE: boolean | undefined;
@@ -263,7 +264,7 @@ async function checkGhRateLimit(): Promise<Check> {
 }
 
 export async function runDoctor(opts: { json?: boolean; fix?: boolean } = {}): Promise<void> {
-  const binPath = process.argv[0] ?? "";
+  const binPath = getBinPath();
   const checks: Check[] = [
     await checkVersion(),
     checkInstallMethod(),
