@@ -9,6 +9,7 @@ import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { defineCommand } from "citty";
 import { VERSION } from "../generated/version.js";
+import { getBinPath } from "../lib/bin-path.js";
 
 // Compile-time defines from `bun build --compile --define`. In dev mode they're undefined.
 declare const IS_STANDALONE: boolean | undefined;
@@ -100,11 +101,6 @@ async function downloadArchive(tag: string, archiveName: string): Promise<Uint8A
 
 function sha256(data: Uint8Array): string {
   return createHash("sha256").update(data).digest("hex");
-}
-
-function getBinPath(): string {
-  // argv[0] in a compiled bun binary is the binary path
-  return process.argv[0] ?? "";
 }
 
 function isSameVersion(latest: string): boolean {
