@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.1.0](https://github.com/rendobar/cli/compare/v1.0.1...v1.1.0) (2026-05-31)
+
+
+### Features
+
+* add welcome screen for bare `rb` and `rb --help` ([#15](https://github.com/rendobar/cli/issues/15)) ([a4e3550](https://github.com/rendobar/cli/commit/a4e355017a98251f7f057f024b4001342fa16fcd))
+
+
+### Bug Fixes
+
+* locate running binary via execPath instead of argv[0] ([#16](https://github.com/rendobar/cli/issues/16)) ([c233e1f](https://github.com/rendobar/cli/commit/c233e1f1a7d354e152be62f8a6046d4d0b6904b5))
+* shell-escape ffmpeg argv before joining for API submission ([#14](https://github.com/rendobar/cli/issues/14)) ([761396f](https://github.com/rendobar/cli/commit/761396f88120211daeed258301f4dedd97b9731d))
+
 ## [1.0.1](https://github.com/rendobar/cli/compare/v1.0.0...v1.0.1) (2026-04-24)
 
 
