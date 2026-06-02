@@ -27,7 +27,7 @@
   },
   "dependencies": {
     "@rendobar/sdk": "^1.0.0",
-    "citty": "^0.1.6",
+    "citty": "^0.2.0",
     "picocolors": "^1.1.1",
     "@clack/prompts": "^1.2.0"
   },
