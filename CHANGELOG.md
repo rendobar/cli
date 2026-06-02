@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/rendobar/cli/compare/v1.1.1...v1.2.0) (2026-06-02)
+
+
+### Features
+
+* submit ffmpeg job type instead of raw.ffmpeg ([#32](https://github.com/rendobar/cli/issues/32)) ([e65042b](https://github.com/rendobar/cli/commit/e65042be972ec9befb5639c69bca263488109085))
+
 ## [1.1.1](https://github.com/rendobar/cli/compare/v1.1.0...v1.1.1) (2026-06-02)
 
 
