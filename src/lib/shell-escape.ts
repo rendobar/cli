@@ -1,7 +1,7 @@
 /**
  * POSIX shell-escape an argv element for embedding in a single command string.
  *
- * Used when the CLI joins argv into a `command` field for `raw.ffmpeg` job
+ * Used when the CLI joins argv into a `command` field for `ffmpeg` job
  * submission. The API-side parser implements the matching POSIX rules so
  * `argv → shellEscape → join → parse → argv` is lossless.
  *
