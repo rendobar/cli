@@ -157,7 +157,7 @@ describe("shellEscape", () => {
     // to "" — but our parser drops empty quoted segments via the
     // `current.length > 0` push gate. That's a known/accepted limitation:
     // ffmpeg never takes empty argv elements and the CLI never produces them
-    // for raw.ffmpeg. Filter the empty out before comparing.
+    // for ffmpeg. Filter the empty out before comparing.
     expect(parse(command)).toEqual(argv.filter((a) => a.length > 0));
   });
 });

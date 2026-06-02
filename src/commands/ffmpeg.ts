@@ -164,7 +164,7 @@ export default defineCommand({
 
       const job = await steps.step("Submitting", async () => {
         return client.jobs.create(
-          { type: "raw.ffmpeg", params: { command, timeout: flags.timeout } },
+          { type: "ffmpeg", params: { command, timeout: flags.timeout } },
           { signal: controller.signal },
         );
       });
