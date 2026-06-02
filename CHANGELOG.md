@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.1](https://github.com/rendobar/cli/compare/v1.1.0...v1.1.1) (2026-06-02)
+
+
+### Bug Fixes
+
+* **deps:** bump dependency citty to ^0.2.0 ([#24](https://github.com/rendobar/cli/issues/24)) ([4f3ecbe](https://github.com/rendobar/cli/commit/4f3ecbe87929b4b40bb5d971c70ca2ee1a8cbbbf))
+
 ## [1.1.0](https://github.com/rendobar/cli/compare/v1.0.1...v1.1.0) (2026-05-31)
 
 
