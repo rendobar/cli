@@ -45,17 +45,18 @@ jobs:
           path: demos/out/
           retention-days: 30
 
-      - name: Bundle for release
-        if: startsWith(github.ref, 'refs/tags/v')
-        run: |
-          cd demos/out
-          zip -r ../../demos.zip .
-
+      # Attach the rendered media straight to the release. The vhs container
+      # (debian:stable-slim) ships no `zip`, and bundling 3 files into an
+      # archive nobody can preview adds no value -- hero.gif renders inline on
+      # the release page, the mp4/webm download as-is.
       - name: Attach to release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda  # v3.0.0
         with:
-          files: demos.zip
+          files: |
+            demos/out/hero.gif
+            demos/out/hero.mp4
+            demos/out/hero.webm
 
       - name: Drift check (main branch)
         if: github.ref == 'refs/heads/main'
