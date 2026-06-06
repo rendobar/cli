@@ -8,7 +8,7 @@ import { homedir, platform, arch } from "node:os";
 import { spawnSync } from "node:child_process";
 import { defineCommand } from "citty";
 import { VERSION } from "../generated/version.js";
-import { getConfigDir } from "../lib/auth.js";
+import { getConfigDir, getApiBaseUrl } from "../lib/auth.js";
 import { getBinPath } from "../lib/bin-path.js";
 
 // Compile-time defines from `bun build --compile --define`. In dev mode they're undefined.
@@ -134,15 +134,17 @@ function checkUpdateCache(): Check {
 }
 
 async function checkApiReachable(): Promise<Check> {
+  const baseUrl = getApiBaseUrl();
+  const host = (() => { try { return new URL(baseUrl).host; } catch { return baseUrl; } })();
   try {
-    const res = await fetchWithTimeout("https://api.rendobar.com/health");
+    const res = await fetchWithTimeout(`${baseUrl}/health`);
     if (res.ok) {
-      return { name: "api.rendobar.com", status: "ok", detail: `HTTP ${res.status}` };
+      return { name: host, status: "ok", detail: `HTTP ${res.status}` };
     }
-    return { name: "api.rendobar.com", status: "warn", detail: `HTTP ${res.status}` };
+    return { name: host, status: "warn", detail: `HTTP ${res.status}` };
   } catch (err) {
     return {
-      name: "api.rendobar.com",
+      name: host,
       status: "fail",
       detail: (err as Error).message,
       fix: "Check your internet connection or status.rendobar.com",

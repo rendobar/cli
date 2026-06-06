@@ -7,6 +7,8 @@
  * waitForJob: WebSocket → polls for terminal status, captures machine
  * context from job.context events and passes to onContext callback.
  */
+import * as path from "node:path";
+import * as fs from "node:fs/promises";
 import pc from "picocolors";
 import type { RendobarClient } from "@rendobar/sdk";
 
@@ -443,12 +445,11 @@ function waitViaWebSocket(
 
 // ── Download ───────────────────────────────────────────────────
 
-export async function downloadOutput(
-  client: RendobarClient,
-  jobId: string,
-  outputPath: string,
-): Promise<void> {
-  const response = await client.jobs.download(jobId);
+/**
+ * Stream a fetch `Response` body to a local path. Large bodies stream in 1 MiB
+ * chunks (bounded memory); small ones write in one shot.
+ */
+async function streamToFile(response: Response, outputPath: string): Promise<void> {
   const totalBytes = Number(response.headers.get("content-length") || 0);
 
   if (totalBytes > 1_000_000 && response.body) {
@@ -465,5 +466,73 @@ export async function downloadOutput(
     }
   } else {
     await Bun.write(outputPath, response);
+  }
+}
+
+/**
+ * Download the job's headline output via the SDK `/download` endpoint to a local
+ * path. Kept for the single-file case where no per-file url is needed.
+ */
+export async function downloadOutput(
+  client: RendobarClient,
+  jobId: string,
+  outputPath: string,
+): Promise<void> {
+  const response = await client.jobs.download(jobId);
+  await streamToFile(response, outputPath);
+}
+
+/**
+ * Download a single ready-to-fetch (signed) URL from the job response to a local
+ * path. Uses the url verbatim — never reconstructs a host.
+ */
+export async function downloadUrlToFile(
+  url: string,
+  outputPath: string,
+  signal?: AbortSignal,
+): Promise<void> {
+  const response = await fetch(url, { signal });
+  if (!response.ok) {
+    throw new Error(`Download failed (${response.status}) for ${url}`);
+  }
+  await streamToFile(response, outputPath);
+}
+
+/**
+ * Download every file of a set/stream output into a local directory, preserving
+ * each file's relative `path` (so an HLS manifest + its segments land alongside
+ * each other and play locally). Returns the local paths written.
+ *
+ * Each file is fetched from its own signed `url` in the response — no host is
+ * ever hardcoded.
+ */
+export async function downloadFilesToDir(
+  files: JobFile[],
+  dir: string,
+  signal?: AbortSignal,
+): Promise<string[]> {
+  const written: string[] = [];
+  for (const file of files) {
+    // Fall back to the url's basename if the file carries no relative path.
+    const rel = file.path && file.path.trim().length > 0
+      ? file.path
+      : basenameFromUrl(file.url);
+    // Strip any leading slashes / drive-absolute prefix so join stays under dir.
+    const safeRel = rel.replace(/^([a-zA-Z]:)?[\\/]+/, "");
+    const target = path.join(dir, safeRel);
+    await fs.mkdir(path.dirname(target), { recursive: true });
+    await downloadUrlToFile(file.url, target, signal);
+    written.push(target);
+  }
+  return written;
+}
+
+function basenameFromUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    const last = u.pathname.split("/").filter(Boolean).pop();
+    return last && last.length > 0 ? decodeURIComponent(last) : "output";
+  } catch {
+    return "output";
   }
 }
