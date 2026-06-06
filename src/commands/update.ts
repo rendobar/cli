@@ -2,7 +2,7 @@
  * `rb update` — Self-replace for standalone binary, print install instructions for dev mode.
  * Detects install method via compile-time IS_STANDALONE define.
  */
-import { writeFileSync, mkdirSync, existsSync, chmodSync, renameSync, unlinkSync, rmSync } from "node:fs";
+import { writeFileSync, mkdirSync, existsSync, chmodSync, renameSync, unlinkSync, rmSync, readdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { homedir } from "node:os";
 import { spawnSync } from "node:child_process";
@@ -150,6 +150,26 @@ async function updateBinary(latest: string): Promise<void> {
   const tmpBinPath = `${binPath}.new`;
   const bakBinPath = `${binPath}.bak`;
   const archiveBase = ext === ".tar.gz" ? "rb" : "rb.exe";
+
+  // Sweep leftovers from interrupted updates before starting. The pre-1.3.2
+  // updater extracted into binDir and, on failure, could strand a partial
+  // `update-<ts>.zip`/`.tar.gz` archive or a half-staged `.new` binary; a killed
+  // run of the current updater can strand a `.rb-update-<ts>` temp dir. None are
+  // reused, so clear them so they don't pile up. Never touch `.bak` — that's the
+  // intentional one-version rollback.
+  try {
+    for (const name of readdirSync(binDir)) {
+      const stale =
+        /^update-\d+\.(zip|tar\.gz)$/.test(name) ||
+        name.startsWith(".rb-update-") ||
+        name === "rb.new" ||
+        name === "rb.exe.new";
+      if (stale) rmSync(join(binDir, name), { recursive: true, force: true });
+    }
+  } catch {
+    // Best-effort — never block an update on cleanup.
+  }
+
   const extractDir = join(binDir, `.rb-update-${Date.now()}`);
   mkdirSync(extractDir, { recursive: true });
 
