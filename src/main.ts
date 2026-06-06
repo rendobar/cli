@@ -4,15 +4,48 @@
  * Bare `rb` and `rb --help` render the welcome screen. Subcommands are derived
  * from the central registry. Unknown commands and stray ffmpeg flags are hinted.
  */
+import { spawn } from "node:child_process";
 import { defineCommand, runMain, renderUsage, type CommandDef } from "citty";
 import { VERSION } from "./generated/version.js";
 import { toSubCommands, commandNames, COMMANDS } from "./registry.js";
 import { buildState, renderWelcome, renderHelp, renderWelcomeJson } from "./lib/welcome.js";
+import { checkForUpdate, isRefreshDue } from "./lib/update-check.js";
+
+// Compile-time define from `bun build --compile --define`. Undefined in dev mode
+// (`bun run src/main.ts`), where process.execPath is the bun runtime, not `rb`.
+declare const IS_STANDALONE: boolean | undefined;
+const IS_BIN = typeof IS_STANDALONE !== "undefined" && IS_STANDALONE === true;
 
 // Never crash with an EPIPE stack trace when piped into a closed reader (`rb | head`).
 process.stdout.on("error", (err: NodeJS.ErrnoException) => {
   if (err.code === "EPIPE") process.exit(0);
 });
+
+// Hidden internal entrypoint. A prior invocation spawns `rb __update-check`
+// detached so the GitHub round-trip warms the version cache WITHOUT blocking the
+// user's command — short-lived commands (e.g. the welcome screen) exit long
+// before an inline fetch could finish, which is why the refresh must outlive
+// them in its own process. Not a registered command; handled before all routing.
+function isBackgroundCheck(): boolean {
+  return process.argv.slice(2)[0] === "__update-check";
+}
+
+// On launch, fire the detached refresh if one is due. Best-effort: a failed
+// spawn must never surface to the user or delay their command.
+function spawnBackgroundCheck(): void {
+  if (!IS_BIN) return; // dev mode: execPath is bun, not the rb binary
+  if (!isRefreshDue()) return; // fresh cache or a skip rule (CI, --quiet, ...)
+  try {
+    const child = spawn(process.execPath, ["__update-check"], {
+      detached: true,
+      stdio: "ignore",
+      windowsHide: true,
+    });
+    child.unref();
+  } catch {
+    // Never block the CLI on a failed background spawn.
+  }
+}
 
 const FFMPEG_FLAGS = ["-i", "-vf", "-c:v", "-c:a", "-f", "-filter_complex"];
 
@@ -87,43 +120,58 @@ const main = defineCommand({
   },
 });
 
-// Pre-validate: intercept unknown commands before citty throws with exit 1.
-// citty dispatches to run() only when args parse cleanly, but it throws
-// CLIError("Unknown command") before run() for unrecognised positional args.
-// We catch those here so we can exit 2 instead of 1.
-const rawArgs = process.argv.slice(2);
+// `knownNames` is referenced by the main command's run() closure above, so it
+// stays at module scope.
 const knownNames = new Set([...commandNames(), "help"]);
 
-// Check for --help / --version / -h — citty owns these, don't intercept.
-const isCittyOwned =
-  rawArgs.includes("--help") ||
-  rawArgs.includes("-h") ||
-  (rawArgs.length === 1 && rawArgs[0] === "--version");
+if (isBackgroundCheck()) {
+  // Detached refresh process: warm the cache, then exit. Never touches routing,
+  // stdout, or the user's terminal. Failures stay silent.
+  checkForUpdate(VERSION)
+    .catch(() => {})
+    .finally(() => process.exit(0));
+} else {
+  // Kick off the next refresh in the background before handing control to the
+  // CLI. The notice shown this run (if any) comes from a prior run's cache.
+  spawnBackgroundCheck();
 
-if (!isCittyOwned) {
-  const firstPositional = rawArgs.find((a) => !a.startsWith("-"));
-  if (firstPositional !== undefined && !knownNames.has(firstPositional)) {
-    // Unknown first positional — but first check if any arg looks like an
-    // ffmpeg flag (e.g. `rb -i in.mp4 out.mp4` or `rb -vf scale=1:1`).
-    // The check must run even when the first positional isn't itself a flag,
-    // because the flag may appear after file arguments.
-    if (rawArgs.some((a) => FFMPEG_FLAGS.includes(a))) {
-      process.stderr.write(`Did you mean: rb ffmpeg ${rawArgs.join(" ")}?\n`);
+  // Pre-validate: intercept unknown commands before citty throws with exit 1.
+  // citty dispatches to run() only when args parse cleanly, but it throws
+  // CLIError("Unknown command") before run() for unrecognised positional args.
+  // We catch those here so we can exit 2 instead of 1.
+  const rawArgs = process.argv.slice(2);
+
+  // Check for --help / --version / -h — citty owns these, don't intercept.
+  const isCittyOwned =
+    rawArgs.includes("--help") ||
+    rawArgs.includes("-h") ||
+    (rawArgs.length === 1 && rawArgs[0] === "--version");
+
+  if (!isCittyOwned) {
+    const firstPositional = rawArgs.find((a) => !a.startsWith("-"));
+    if (firstPositional !== undefined && !knownNames.has(firstPositional)) {
+      // Unknown first positional — but first check if any arg looks like an
+      // ffmpeg flag (e.g. `rb -i in.mp4 out.mp4` or `rb -vf scale=1:1`).
+      // The check must run even when the first positional isn't itself a flag,
+      // because the flag may appear after file arguments.
+      if (rawArgs.some((a) => FFMPEG_FLAGS.includes(a))) {
+        process.stderr.write(`Did you mean: rb ffmpeg ${rawArgs.join(" ")}?\n`);
+        process.exit(2);
+      }
+      process.stderr.write(`unknown command '${firstPositional}' -- run \`rb\` to see commands\n`);
       process.exit(2);
     }
-    process.stderr.write(`unknown command '${firstPositional}' -- run \`rb\` to see commands\n`);
-    process.exit(2);
   }
-}
 
-runMain(main, {
-  async showUsage(cmd, parent) {
-    // Root help (`rb --help` / `rb -h`) → our welcome+flags screen.
-    if (!parent) {
-      process.stdout.write(renderHelp(buildState()) + "\n");
-      return;
-    }
-    // Subcommand help (`rb ffmpeg --help`) → citty's default usage.
-    process.stdout.write((await renderUsage(cmd, parent)) + "\n");
-  },
-});
+  runMain(main, {
+    async showUsage(cmd, parent) {
+      // Root help (`rb --help` / `rb -h`) → our welcome+flags screen.
+      if (!parent) {
+        process.stdout.write(renderHelp(buildState()) + "\n");
+        return;
+      }
+      // Subcommand help (`rb ffmpeg --help`) → citty's default usage.
+      process.stdout.write((await renderUsage(cmd, parent)) + "\n");
+    },
+  });
+}

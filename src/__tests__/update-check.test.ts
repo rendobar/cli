@@ -151,6 +151,40 @@ describe("update-check", () => {
     expect(cache.latest).toBe("1.1.0");
   });
 
+  it("isRefreshDue: true when no cache exists", async () => {
+    const { isRefreshDue } = await import("../lib/update-check.js");
+    expect(isRefreshDue()).toBe(true);
+  });
+
+  it("isRefreshDue: false when cache is within TTL", async () => {
+    const cachePath = join(tempDir, "update-check.json");
+    mkdirSync(dirname(cachePath), { recursive: true });
+    writeFileSync(
+      cachePath,
+      JSON.stringify({ latest: "1.1.0", checkedAt: Date.now(), ttl: 24 * 60 * 60 * 1000 })
+    );
+    const { isRefreshDue } = await import("../lib/update-check.js");
+    expect(isRefreshDue()).toBe(false);
+  });
+
+  it("isRefreshDue: true when cache is older than TTL", async () => {
+    const cachePath = join(tempDir, "update-check.json");
+    mkdirSync(dirname(cachePath), { recursive: true });
+    const ttl = 24 * 60 * 60 * 1000;
+    writeFileSync(
+      cachePath,
+      JSON.stringify({ latest: "1.1.0", checkedAt: Date.now() - ttl - 1000, ttl })
+    );
+    const { isRefreshDue } = await import("../lib/update-check.js");
+    expect(isRefreshDue()).toBe(true);
+  });
+
+  it("isRefreshDue: false when a skip rule applies (CI)", async () => {
+    process.env.CI = "true";
+    const { isRefreshDue } = await import("../lib/update-check.js");
+    expect(isRefreshDue()).toBe(false);
+  });
+
   it("does not write cache when no CLI release found", async () => {
     const fetchMock = mock(async () =>
       new Response(JSON.stringify([

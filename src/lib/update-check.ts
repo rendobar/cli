@@ -78,6 +78,20 @@ function versionGt(a: string, b: string): boolean {
 }
 
 /**
+ * Cheap synchronous gate: is a background refresh warranted right now?
+ * Honors the same skip rules as the check itself, plus the 24h TTL. Used by the
+ * launcher to decide whether to spawn the detached refresh process at all — so a
+ * fresh cache costs zero subprocesses. No jitter here: jitter exists to spread
+ * the network call across the fleet on release day, not to gate a local spawn.
+ */
+export function isRefreshDue(): boolean {
+  if (shouldSkip()) return false;
+  const cache = readCache();
+  if (!cache) return true;
+  return Date.now() - cache.checkedAt >= cache.ttl;
+}
+
+/**
  * Non-blocking background check. Updates cache file if network succeeds.
  * Uses injected fetch so tests can mock it.
  */
