@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/rendobar/cli/compare/v1.2.0...v1.3.0) (2026-06-06)
+
+
+### Features
+
+* show served multi-file output and ffmpeg errorDetail ([#35](https://github.com/rendobar/cli/issues/35)) ([59587fe](https://github.com/rendobar/cli/commit/59587fe5b4005c5c126262c20c242d62433c97af))
+
 ## [1.2.0](https://github.com/rendobar/cli/compare/v1.1.1...v1.2.0) (2026-06-02)
 
 
