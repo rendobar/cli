@@ -2,7 +2,7 @@
  * `rb update` — Self-replace for standalone binary, print install instructions for dev mode.
  * Detects install method via compile-time IS_STANDALONE define.
  */
-import { writeFileSync, mkdirSync, existsSync, chmodSync, renameSync, unlinkSync } from "node:fs";
+import { writeFileSync, mkdirSync, existsSync, chmodSync, renameSync, unlinkSync, rmSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { homedir } from "node:os";
 import { spawnSync } from "node:child_process";
@@ -139,50 +139,50 @@ async function updateBinary(latest: string): Promise<void> {
   }
   console.log(`Checksum verified: ${actualHash}`);
 
-  // Extract archive to temp path alongside current binary
+  // Extract into an isolated temp dir, NEVER straight into binDir. The archive's
+  // payload (`rb` / `rb.exe`) shares the running binary's name, so extracting
+  // into binDir forces the archiver to overwrite the live executable — which
+  // Windows forbids (the running image is locked; `Expand-Archive -Force`'s
+  // internal Remove-Item fails with "Access to the path ... is denied"). Extract
+  // aside, then rename-swap below: renaming a running binary IS allowed on
+  // Windows, deleting it is not.
   const binDir = dirname(binPath);
   const tmpBinPath = `${binPath}.new`;
   const bakBinPath = `${binPath}.bak`;
+  const archiveBase = ext === ".tar.gz" ? "rb" : "rb.exe";
+  const extractDir = join(binDir, `.rb-update-${Date.now()}`);
+  mkdirSync(extractDir, { recursive: true });
 
-  if (ext === ".tar.gz") {
-    const tmpArchivePath = join(binDir, `update-${Date.now()}.tar.gz`);
+  try {
+    const tmpArchivePath = join(extractDir, `archive${ext}`);
     writeFileSync(tmpArchivePath, archive);
-    const tar = spawnSync("tar", ["-xzf", tmpArchivePath, "-C", binDir], { stdio: "inherit" });
-    try {
-      unlinkSync(tmpArchivePath);
-    } catch {
-      // non-fatal
-    }
-    if (tar.status !== 0) throw new Error("tar extraction failed");
-    const extractedPath = join(binDir, "rb");
-    if (existsSync(extractedPath) && extractedPath !== binPath) {
-      renameSync(extractedPath, tmpBinPath);
-    }
-  } else {
-    const tmpArchivePath = join(binDir, `update-${Date.now()}.zip`);
-    writeFileSync(tmpArchivePath, archive);
-    const expand = spawnSync(
-      "powershell",
-      [
-        "-Command",
-        `Expand-Archive -Path '${tmpArchivePath}' -DestinationPath '${binDir}' -Force`,
-      ],
-      { stdio: "inherit" }
-    );
-    try {
-      unlinkSync(tmpArchivePath);
-    } catch {
-      // non-fatal
-    }
-    if (expand.status !== 0) throw new Error("Expand-Archive failed");
-    const extractedPath = join(binDir, "rb.exe");
-    if (existsSync(extractedPath) && extractedPath !== binPath) {
-      renameSync(extractedPath, tmpBinPath);
-    }
-  }
 
-  if (!existsSync(tmpBinPath)) {
-    throw new Error("extracted binary not found at expected location");
+    if (ext === ".tar.gz") {
+      const tar = spawnSync("tar", ["-xzf", tmpArchivePath, "-C", extractDir], { stdio: "inherit" });
+      if (tar.status !== 0) throw new Error("tar extraction failed");
+    } else {
+      const expand = spawnSync(
+        "powershell",
+        [
+          "-NoProfile",
+          "-Command",
+          `Expand-Archive -Path '${tmpArchivePath}' -DestinationPath '${extractDir}' -Force`,
+        ],
+        { stdio: "inherit" }
+      );
+      if (expand.status !== 0) throw new Error("Expand-Archive failed");
+    }
+
+    const extractedPath = join(extractDir, archiveBase);
+    if (!existsSync(extractedPath)) {
+      throw new Error("extracted binary not found at expected location");
+    }
+    // Stage the new binary next to the live one as `.new` (same volume → the
+    // swap below is atomic). Clear any stale `.new` from an aborted prior run.
+    if (existsSync(tmpBinPath)) unlinkSync(tmpBinPath);
+    renameSync(extractedPath, tmpBinPath);
+  } finally {
+    rmSync(extractDir, { recursive: true, force: true });
   }
 
   chmodSync(tmpBinPath, 0o755);
