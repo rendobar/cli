@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.2](https://github.com/rendobar/cli/compare/v1.3.1...v1.3.2) (2026-06-06)
+
+
+### Bug Fixes
+
+* repair rb update on Windows and wire the background update check ([#37](https://github.com/rendobar/cli/issues/37)) ([69f2a73](https://github.com/rendobar/cli/commit/69f2a7316c7cc434662b5014129611ac71141e37))
+
 ## [1.3.1](https://github.com/rendobar/cli/compare/v1.3.0...v1.3.1) (2026-06-06)
 
 
