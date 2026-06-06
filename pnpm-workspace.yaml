@@ -1,0 +1,13 @@
+# pnpm 11 blocks dependency build scripts by default. lefthook needs its
+# postinstall to install the git hooks behind the commit-msg / pre-commit guards
+# (pnpm 9 ran these automatically).
+allowBuilds:
+  lefthook: true
+
+# pnpm 11 also enables a minimumReleaseAge supply-chain policy by default, which
+# rejects any dependency published within the cooldown window. The drift-check
+# cron bumps @rendobar/sdk to its newest release the same day it publishes, so
+# the default would intermittently fail `pnpm install --frozen-lockfile` in CI
+# until each release "ages in". Disable it to keep CI deterministic; SDK
+# provenance is already covered by npm publish attestations.
+minimumReleaseAge: 0
