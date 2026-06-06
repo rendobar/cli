@@ -7,6 +7,8 @@
  * waitForJob: WebSocket → polls for terminal status, captures machine
  * context from job.context events and passes to onContext callback.
  */
+import * as path from "node:path";
+import * as fs from "node:fs/promises";
 import pc from "picocolors";
 import type { RendobarClient } from "@rendobar/sdk";
 
@@ -14,8 +16,10 @@ import type { RendobarClient } from "@rendobar/sdk";
 
 export interface ProgressResult {
   status: string;
-  outputUrl?: string;
-  error?: string;
+  /** Unified job output, present only when status === "complete". */
+  output?: JobOutput;
+  /** Structured failure, present only when status === "failed". */
+  error?: JobError;
   /** Total: Created → Completed */
   duration: number;
   /** Created → Dispatched (API processing + queue dispatch) */
@@ -32,6 +36,58 @@ export interface MachineContext {
   cpu: number;
   memory: number;
   region?: string;
+}
+
+/**
+ * Unified job output (mirrors the API `Output` shape — one shape for every job
+ * type). The published `@rendobar/sdk` may still export the old discriminated
+ * union, so the CLI narrows the runtime job object defensively against this new
+ * shape. Only the fields the CLI renders are modelled.
+ *
+ *  - data  : computed answer (job-specific JSON), or null for file-only jobs.
+ *  - file  : the headline file — single output OR stream manifest — or null for
+ *            data-only jobs and unordered sets.
+ *  - files : every produced file ([] for data-only jobs).
+ */
+export interface JobOutput {
+  data: unknown;
+  file: JobFile | null;
+  files: JobFile[];
+  expiresAt: number | null;
+}
+
+/** A single produced file (mirrors the API `File` shape). */
+export interface JobFile {
+  url: string;
+  path: string;
+  type: "video" | "image" | "audio" | "captions" | "playlist" | "data" | "other";
+  size: number;
+  meta?: {
+    format?: string;
+    width?: number;
+    height?: number;
+    durationMs?: number;
+  };
+}
+
+/** Structured failure (mirrors the API `error` object). */
+export interface JobError {
+  code: string;
+  message: string;
+  /** Real provider stderr tail (e.g. ffmpeg), or null. */
+  detail: string | null;
+  retryable: boolean;
+}
+
+/**
+ * The single playable/download URL for an output: the headline `file` url
+ * (single file or stream manifest) when present, otherwise the first of `files`
+ * for an unordered set. Returns undefined for data-only outputs (no file) so
+ * `--url-only` prints nothing.
+ */
+export function outputUrl(output: JobOutput): string | undefined {
+  if (output.file) return output.file.url;
+  return output.files[0]?.url;
 }
 
 // ── ANSI ───────────────────────────────────────────────────────
@@ -182,7 +238,7 @@ interface WsResult {
   machine?: MachineContext;
 }
 
-function buildResult(status: string, machine: MachineContext | undefined, job: Record<string, unknown>): ProgressResult {
+export function buildResult(status: string, machine: MachineContext | undefined, job: Record<string, unknown>): ProgressResult {
   const createdAt = typeof job.createdAt === "number" ? job.createdAt : 0;
   const dispatchedAt = typeof job.dispatchedAt === "number" ? job.dispatchedAt : 0;
   const startedAt = typeof job.startedAt === "number" ? job.startedAt : 0;
@@ -199,13 +255,98 @@ function buildResult(status: string, machine: MachineContext | undefined, job: R
 
   return {
     status,
-    outputUrl: typeof job.outputUrl === "string" ? job.outputUrl : undefined,
-    error: typeof job.errorMessage === "string" ? job.errorMessage : undefined,
+    output: parseOutput(job.output),
+    error: parseError(job.error),
     duration: totalMs,
     dispatchMs,
     queueMs,
     execMs,
     machine,
+  };
+}
+
+function asRecord(raw: unknown): Record<string, unknown> | undefined {
+  return raw && typeof raw === "object" ? (raw as Record<string, unknown>) : undefined;
+}
+
+function optString(v: unknown): string | undefined {
+  return typeof v === "string" ? v : undefined;
+}
+
+function optNumber(v: unknown): number | undefined {
+  return typeof v === "number" ? v : undefined;
+}
+
+const FILE_TYPES = new Set(["video", "image", "audio", "captions", "playlist", "data", "other"]);
+
+/**
+ * Narrow an unknown value into a `JobFile`. Returns undefined when the shape is
+ * unexpected (missing url, etc).
+ */
+function parseFile(raw: unknown): JobFile | undefined {
+  const f = asRecord(raw);
+  if (!f) return undefined;
+  if (typeof f.url !== "string") return undefined;
+  const type = typeof f.type === "string" && FILE_TYPES.has(f.type)
+    ? (f.type as JobFile["type"])
+    : "other";
+  const meta = asRecord(f.meta);
+  return {
+    url: f.url,
+    path: typeof f.path === "string" ? f.path : "",
+    type,
+    size: optNumber(f.size) ?? 0,
+    meta: meta
+      ? {
+          format: optString(meta.format),
+          width: optNumber(meta.width),
+          height: optNumber(meta.height),
+          durationMs: optNumber(meta.durationMs),
+        }
+      : undefined,
+  };
+}
+
+/**
+ * Narrow an unknown `output` field (from the runtime job object) into the
+ * unified `JobOutput` the CLI renders. Returns undefined when there is no output
+ * (job not complete) or the shape is unexpected. Read off
+ * `Record<string, unknown>` because the published SDK type may still carry the
+ * old discriminated union.
+ */
+function parseOutput(raw: unknown): JobOutput | undefined {
+  const o = asRecord(raw);
+  if (!o) return undefined;
+
+  // The unified shape always carries a `files` array. Require it to avoid
+  // mis-reading an old-shaped or malformed object as an empty output.
+  if (!Array.isArray(o.files)) return undefined;
+
+  const files = o.files
+    .map(parseFile)
+    .filter((f): f is JobFile => f !== undefined);
+
+  return {
+    data: "data" in o ? o.data : null,
+    file: o.file === null || o.file === undefined ? null : (parseFile(o.file) ?? null),
+    files,
+    expiresAt: optNumber(o.expiresAt) ?? null,
+  };
+}
+
+/**
+ * Narrow an unknown `error` field into the structured `JobError` the CLI
+ * renders. Returns undefined when the shape is unexpected (e.g. no error).
+ */
+function parseError(raw: unknown): JobError | undefined {
+  const o = asRecord(raw);
+  if (!o) return undefined;
+  if (typeof o.code !== "string" || typeof o.message !== "string") return undefined;
+  return {
+    code: o.code,
+    message: o.message,
+    detail: typeof o.detail === "string" ? o.detail : null,
+    retryable: o.retryable === true,
   };
 }
 
@@ -304,12 +445,11 @@ function waitViaWebSocket(
 
 // ── Download ───────────────────────────────────────────────────
 
-export async function downloadOutput(
-  client: RendobarClient,
-  jobId: string,
-  outputPath: string,
-): Promise<void> {
-  const response = await client.jobs.download(jobId);
+/**
+ * Stream a fetch `Response` body to a local path. Large bodies stream in 1 MiB
+ * chunks (bounded memory); small ones write in one shot.
+ */
+async function streamToFile(response: Response, outputPath: string): Promise<void> {
   const totalBytes = Number(response.headers.get("content-length") || 0);
 
   if (totalBytes > 1_000_000 && response.body) {
@@ -326,5 +466,73 @@ export async function downloadOutput(
     }
   } else {
     await Bun.write(outputPath, response);
+  }
+}
+
+/**
+ * Download the job's headline output via the SDK `/download` endpoint to a local
+ * path. Kept for the single-file case where no per-file url is needed.
+ */
+export async function downloadOutput(
+  client: RendobarClient,
+  jobId: string,
+  outputPath: string,
+): Promise<void> {
+  const response = await client.jobs.download(jobId);
+  await streamToFile(response, outputPath);
+}
+
+/**
+ * Download a single ready-to-fetch (signed) URL from the job response to a local
+ * path. Uses the url verbatim — never reconstructs a host.
+ */
+export async function downloadUrlToFile(
+  url: string,
+  outputPath: string,
+  signal?: AbortSignal,
+): Promise<void> {
+  const response = await fetch(url, { signal });
+  if (!response.ok) {
+    throw new Error(`Download failed (${response.status}) for ${url}`);
+  }
+  await streamToFile(response, outputPath);
+}
+
+/**
+ * Download every file of a set/stream output into a local directory, preserving
+ * each file's relative `path` (so an HLS manifest + its segments land alongside
+ * each other and play locally). Returns the local paths written.
+ *
+ * Each file is fetched from its own signed `url` in the response — no host is
+ * ever hardcoded.
+ */
+export async function downloadFilesToDir(
+  files: JobFile[],
+  dir: string,
+  signal?: AbortSignal,
+): Promise<string[]> {
+  const written: string[] = [];
+  for (const file of files) {
+    // Fall back to the url's basename if the file carries no relative path.
+    const rel = file.path && file.path.trim().length > 0
+      ? file.path
+      : basenameFromUrl(file.url);
+    // Strip any leading slashes / drive-absolute prefix so join stays under dir.
+    const safeRel = rel.replace(/^([a-zA-Z]:)?[\\/]+/, "");
+    const target = path.join(dir, safeRel);
+    await fs.mkdir(path.dirname(target), { recursive: true });
+    await downloadUrlToFile(file.url, target, signal);
+    written.push(target);
+  }
+  return written;
+}
+
+function basenameFromUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    const last = u.pathname.split("/").filter(Boolean).pop();
+    return last && last.length > 0 ? decodeURIComponent(last) : "output";
+  } catch {
+    return "output";
   }
 }

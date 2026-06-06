@@ -8,6 +8,10 @@ export function getApiBaseUrl(): string {
   return process.env.RENDOBAR_API_URL ?? "https://api.rendobar.com";
 }
 
+export function getDashboardBaseUrl(): string {
+  return process.env.RENDOBAR_APP_URL ?? "https://app.rendobar.com";
+}
+
 // ── Types ────────────────────────────────────────────────────
 
 export type AuthCredential =
