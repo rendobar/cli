@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.3](https://github.com/rendobar/cli/compare/v1.3.2...v1.3.3) (2026-06-06)
+
+
+### Bug Fixes
+
+* prune leftover update artifacts from the bin dir before updating ([#41](https://github.com/rendobar/cli/issues/41)) ([f05252c](https://github.com/rendobar/cli/commit/f05252cd03eb6818b04a5ba2de5b89e5c921cf6e))
+
 ## [1.3.2](https://github.com/rendobar/cli/compare/v1.3.1...v1.3.2) (2026-06-06)
 
 
