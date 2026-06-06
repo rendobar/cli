@@ -14,7 +14,7 @@ import type { RendobarClient } from "@rendobar/sdk";
 
 export interface ProgressResult {
   status: string;
-  /** Discriminated job output, present only when status === "complete". */
+  /** Unified job output, present only when status === "complete". */
   output?: JobOutput;
   /** Structured failure, present only when status === "failed". */
   error?: JobError;
@@ -37,43 +37,36 @@ export interface MachineContext {
 }
 
 /**
- * Discriminated job output (mirrors the API `Output` union, keyed on `kind`).
+ * Unified job output (mirrors the API `Output` shape — one shape for every job
+ * type). The published `@rendobar/sdk` may still export the old discriminated
+ * union, so the CLI narrows the runtime job object defensively against this new
+ * shape. Only the fields the CLI renders are modelled.
  *
- * The published `@rendobar/sdk` does not export this union yet (it ships in a
- * later SDK release), so the CLI narrows the runtime job object defensively
- * against the same shape. Only the fields the CLI renders are modelled.
- *
- *  - file   : single download URL + probe metadata.
- *  - stream : HLS/DASH playlist (entry url + manifest hint) over a served prefix.
- *  - set    : unordered multi-file collection over a served prefix (no entry url).
+ *  - data  : computed answer (job-specific JSON), or null for file-only jobs.
+ *  - file  : the headline file — single output OR stream manifest — or null for
+ *            data-only jobs and unordered sets.
+ *  - files : every produced file ([] for data-only jobs).
  */
-export type JobOutput =
-  | {
-      kind: "file";
-      url: string;
-      poster: string | null;
-      meta: {
-        format?: string;
-        width?: number;
-        height?: number;
-        durationMs?: number;
-        sizeBytes?: number;
-      };
-    }
-  | {
-      kind: "stream";
-      url: string;
-      manifest: "hls" | "dash";
-      baseUrl: string;
-      fileCount: number;
-      manifestUrl: string;
-    }
-  | {
-      kind: "set";
-      baseUrl: string;
-      fileCount: number;
-      manifestUrl: string;
-    };
+export interface JobOutput {
+  data: unknown;
+  file: JobFile | null;
+  files: JobFile[];
+  expiresAt: number | null;
+}
+
+/** A single produced file (mirrors the API `File` shape). */
+export interface JobFile {
+  url: string;
+  path: string;
+  type: "video" | "image" | "audio" | "captions" | "playlist" | "data" | "other";
+  size: number;
+  meta?: {
+    format?: string;
+    width?: number;
+    height?: number;
+    durationMs?: number;
+  };
+}
 
 /** Structured failure (mirrors the API `error` object). */
 export interface JobError {
@@ -85,23 +78,14 @@ export interface JobError {
 }
 
 /**
- * The single playable/download URL for an output: the download URL for a file,
- * the entry playlist for a stream, the prefix base URL for a set (which has no
- * entry url). Mirrors the SDK's `outputUrl(job)` helper for sets-vs-not, but
- * always returns a string so `--url-only` has something to print.
+ * The single playable/download URL for an output: the headline `file` url
+ * (single file or stream manifest) when present, otherwise the first of `files`
+ * for an unordered set. Returns undefined for data-only outputs (no file) so
+ * `--url-only` prints nothing.
  */
-export function outputUrl(output: JobOutput): string {
-  switch (output.kind) {
-    case "file":
-    case "stream":
-      return output.url;
-    case "set":
-      return output.baseUrl;
-    default: {
-      const _exhaustive: never = output;
-      return _exhaustive;
-    }
-  }
+export function outputUrl(output: JobOutput): string | undefined {
+  if (output.file) return output.file.url;
+  return output.files[0]?.url;
 }
 
 // ── ANSI ───────────────────────────────────────────────────────
@@ -291,71 +275,61 @@ function optNumber(v: unknown): number | undefined {
   return typeof v === "number" ? v : undefined;
 }
 
+const FILE_TYPES = new Set(["video", "image", "audio", "captions", "playlist", "data", "other"]);
+
+/**
+ * Narrow an unknown value into a `JobFile`. Returns undefined when the shape is
+ * unexpected (missing url, etc).
+ */
+function parseFile(raw: unknown): JobFile | undefined {
+  const f = asRecord(raw);
+  if (!f) return undefined;
+  if (typeof f.url !== "string") return undefined;
+  const type = typeof f.type === "string" && FILE_TYPES.has(f.type)
+    ? (f.type as JobFile["type"])
+    : "other";
+  const meta = asRecord(f.meta);
+  return {
+    url: f.url,
+    path: typeof f.path === "string" ? f.path : "",
+    type,
+    size: optNumber(f.size) ?? 0,
+    meta: meta
+      ? {
+          format: optString(meta.format),
+          width: optNumber(meta.width),
+          height: optNumber(meta.height),
+          durationMs: optNumber(meta.durationMs),
+        }
+      : undefined,
+  };
+}
+
 /**
  * Narrow an unknown `output` field (from the runtime job object) into the
- * discriminated `JobOutput` the CLI renders. Returns undefined when there is no
- * output (job not complete) or the shape is unexpected. Read off
- * `Record<string, unknown>` because the published SDK type does not export this
- * union yet.
+ * unified `JobOutput` the CLI renders. Returns undefined when there is no output
+ * (job not complete) or the shape is unexpected. Read off
+ * `Record<string, unknown>` because the published SDK type may still carry the
+ * old discriminated union.
  */
 function parseOutput(raw: unknown): JobOutput | undefined {
   const o = asRecord(raw);
   if (!o) return undefined;
 
-  if (o.kind === "file") {
-    if (typeof o.url !== "string") return undefined;
-    const meta = asRecord(o.meta) ?? {};
-    return {
-      kind: "file",
-      url: o.url,
-      poster: typeof o.poster === "string" ? o.poster : null,
-      meta: {
-        format: optString(meta.format),
-        width: optNumber(meta.width),
-        height: optNumber(meta.height),
-        durationMs: optNumber(meta.durationMs),
-        sizeBytes: optNumber(meta.sizeBytes),
-      },
-    };
-  }
+  // The unified shape always carries a `files` array. Require it to avoid
+  // mis-reading an old-shaped or malformed object as an empty output.
+  if (!Array.isArray(o.files)) return undefined;
 
-  if (o.kind === "stream") {
-    if (
-      typeof o.url !== "string" ||
-      (o.manifest !== "hls" && o.manifest !== "dash") ||
-      typeof o.baseUrl !== "string" ||
-      typeof o.fileCount !== "number" ||
-      typeof o.manifestUrl !== "string"
-    ) {
-      return undefined;
-    }
-    return {
-      kind: "stream",
-      url: o.url,
-      manifest: o.manifest,
-      baseUrl: o.baseUrl,
-      fileCount: o.fileCount,
-      manifestUrl: o.manifestUrl,
-    };
-  }
+  const files = o.files
+    .map(parseFile)
+    .filter((f): f is JobFile => f !== undefined);
 
-  if (o.kind === "set") {
-    if (
-      typeof o.baseUrl !== "string" ||
-      typeof o.fileCount !== "number" ||
-      typeof o.manifestUrl !== "string"
-    ) {
-      return undefined;
-    }
-    return {
-      kind: "set",
-      baseUrl: o.baseUrl,
-      fileCount: o.fileCount,
-      manifestUrl: o.manifestUrl,
-    };
-  }
-
-  return undefined;
+  return {
+    data: "data" in o ? o.data : null,
+    file: o.file === null || o.file === undefined ? null : (parseFile(o.file) ?? null),
+    files,
+    expiresAt: optNumber(o.expiresAt) ?? null,
+  };
 }
 
 /**

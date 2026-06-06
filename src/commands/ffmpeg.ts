@@ -245,42 +245,59 @@ export default defineCommand({
       // ── Output modes ─────────────────────────────────────
       if (flags.json) { console.log(JSON.stringify(result)); process.exit(0); }
       if (flags.urlOnly) {
-        // file/stream → playable url; set → prefix base url.
-        if (result.output) console.log(outputUrl(result.output));
+        // headline file url (single file or stream manifest); first file for a set.
+        const url = result.output ? outputUrl(result.output) : undefined;
+        if (url) console.log(url);
         process.exit(0);
       }
 
-      // ── 4. Download output ───────────────────────────────
+      // ── 4. Download / render output ──────────────────────
+      // Unified output shape: `file` is the headline (single file or stream
+      // manifest), `files` lists every produced file, `data` is the computed
+      // answer for data-only jobs. We render whichever applies.
       const out = result.output;
-      if (parsed.outputFile && out?.kind === "file") {
+      const file = out?.file ?? null;
+      const isStream = file?.type === "playlist";
+      const dashboardLine = `    ${pc.dim(`https://app.rendobar.com/jobs/${job.id}`)}\n`;
+
+      if (parsed.outputFile && file && !isStream) {
+        // Headline single file + a local output path requested: download it.
         const outputPath = path.resolve(parsed.outputFile);
         await steps.step("Saving", async () => {
           return downloadOutput(client, job.id, outputPath);
         });
 
         if (!flags.quiet && isTTY) {
-          const dims = out.meta.width && out.meta.height ? ` ${pc.dim(`${out.meta.width}×${out.meta.height}`)}` : "";
+          const dims = file.meta?.width && file.meta?.height ? ` ${pc.dim(`${file.meta.width}×${file.meta.height}`)}` : "";
           process.stderr.write(`\n  ${pc.green("→")} ${pc.bold(parsed.outputFile)}${dims}\n`);
-          process.stderr.write(`    ${pc.dim(`https://app.rendobar.com/jobs/${job.id}`)}\n`);
+          process.stderr.write(dashboardLine);
         }
-      } else if (out?.kind === "file" && !flags.quiet && isTTY) {
-        // Single output, no local file requested: print its download URL.
-        process.stderr.write(`\n  ${pc.green("→")} ${pc.bold(out.url)}\n`);
-        process.stderr.write(`    ${pc.dim(`https://app.rendobar.com/jobs/${job.id}`)}\n`);
-      } else if (out?.kind === "stream" && !flags.quiet && isTTY) {
-        // HLS/DASH stream: print the playable entry playlist + file count.
-        const fileLabel = out.fileCount === 1 ? "file" : "files";
-        process.stderr.write(`\n  ${pc.green("→")} ${pc.bold(out.url)}\n`);
-        process.stderr.write(`    ${pc.dim(`${out.manifest.toUpperCase()} · ${out.fileCount} ${fileLabel}`)}\n`);
-        process.stderr.write(`    ${pc.dim(`https://app.rendobar.com/jobs/${job.id}`)}\n`);
-      } else if (out?.kind === "set" && !flags.quiet && isTTY) {
-        // Unordered multi-file set: no entry url, print the prefix base + count.
-        const fileLabel = out.fileCount === 1 ? "file" : "files";
-        process.stderr.write(`\n  ${pc.green("→")} ${pc.bold(out.baseUrl)}\n`);
-        process.stderr.write(`    ${pc.dim(`${out.fileCount} ${fileLabel}`)}\n`);
-        process.stderr.write(`    ${pc.dim(`https://app.rendobar.com/jobs/${job.id}`)}\n`);
+      } else if (isStream && file && out && !flags.quiet && isTTY) {
+        // HLS/DASH stream: print the playable manifest url + file count.
+        const count = out.files.length;
+        const fileLabel = count === 1 ? "file" : "files";
+        process.stderr.write(`\n  ${pc.green("→")} ${pc.bold(file.url)}\n`);
+        if (count > 0) process.stderr.write(`    ${pc.dim(`${count} ${fileLabel}`)}\n`);
+        process.stderr.write(dashboardLine);
+      } else if (file && !flags.quiet && isTTY) {
+        // Single output, no local file requested: print its download URL + dims.
+        const dims = file.meta?.width && file.meta?.height ? ` ${pc.dim(`${file.meta.width}×${file.meta.height}`)}` : "";
+        process.stderr.write(`\n  ${pc.green("→")} ${pc.bold(file.url)}${dims}\n`);
+        process.stderr.write(dashboardLine);
+      } else if (out && out.files.length > 0 && !flags.quiet && isTTY) {
+        // Unordered multi-file set (no headline file): list each produced file.
+        const fileLabel = out.files.length === 1 ? "file" : "files";
+        process.stderr.write(`\n  ${pc.green("→")} ${pc.bold(`${out.files.length} ${fileLabel}`)}\n`);
+        for (const f of out.files) {
+          process.stderr.write(`    ${pc.dim(f.path || f.url)}\n`);
+        }
+        process.stderr.write(dashboardLine);
+      } else if (out && out.data !== null && out.data !== undefined && !flags.quiet && isTTY) {
+        // Data-only job: print the structured result as pretty JSON.
+        process.stderr.write(`\n${JSON.stringify(out.data, null, 2)}\n`);
+        process.stderr.write(dashboardLine);
       } else if (!flags.quiet && isTTY) {
-        process.stderr.write(`\n    ${pc.dim(`https://app.rendobar.com/jobs/${job.id}`)}\n`);
+        process.stderr.write(`\n${dashboardLine}`);
       }
 
       process.exit(0);

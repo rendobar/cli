@@ -1,68 +1,96 @@
 import { describe, it, expect } from "bun:test";
 import { buildResult, outputUrl } from "../lib/progress.js";
 
-describe("buildResult — discriminated output", () => {
-  it("reads a file output (download url + meta)", () => {
+describe("buildResult — unified output", () => {
+  it("reads a file output (headline file + meta)", () => {
     const r = buildResult("complete", undefined, {
       output: {
-        kind: "file",
-        url: "https://cdn.rendobar.com/jobs/job_1/output.mp4",
+        data: null,
+        file: {
+          url: "https://cdn.rendobar.com/jobs/job_1/output.mp4",
+          path: "output.mp4",
+          type: "video",
+          size: 4096,
+          meta: { format: "mp4", width: 1280, height: 720 },
+        },
+        files: [
+          {
+            url: "https://cdn.rendobar.com/jobs/job_1/output.mp4",
+            path: "output.mp4",
+            type: "video",
+            size: 4096,
+            meta: { format: "mp4", width: 1280, height: 720 },
+          },
+        ],
         expiresAt: 123,
-        poster: null,
-        meta: { format: "mp4", width: 1280, height: 720, sizeBytes: 4096 },
       },
     });
-    expect(r.output?.kind).toBe("file");
-    if (r.output?.kind === "file") {
-      expect(r.output.url).toBe("https://cdn.rendobar.com/jobs/job_1/output.mp4");
-      expect(r.output.poster).toBeNull();
-      expect(r.output.meta.width).toBe(1280);
-    }
+    expect(r.output?.data).toBeNull();
+    expect(r.output?.file?.url).toBe("https://cdn.rendobar.com/jobs/job_1/output.mp4");
+    expect(r.output?.file?.type).toBe("video");
+    expect(r.output?.file?.meta?.width).toBe(1280);
+    expect(r.output?.files.length).toBe(1);
+    expect(r.output?.expiresAt).toBe(123);
     expect(r.error).toBeUndefined();
   });
 
-  it("reads a stream output (HLS playlist)", () => {
+  it("reads a stream output (playlist headline file)", () => {
     const r = buildResult("complete", undefined, {
       output: {
-        kind: "stream",
-        url: "https://api.rendobar.com/v/job_1/tok/master.m3u8",
-        manifest: "hls",
-        baseUrl: "https://api.rendobar.com/v/job_1/tok/",
+        data: null,
+        file: {
+          url: "https://api.rendobar.com/v/job_1/tok/master.m3u8",
+          path: "master.m3u8",
+          type: "playlist",
+          size: 512,
+        },
+        files: [
+          { url: "https://api.rendobar.com/v/job_1/tok/seg0.ts", path: "seg0.ts", type: "video", size: 1000 },
+          { url: "https://api.rendobar.com/v/job_1/tok/seg1.ts", path: "seg1.ts", type: "video", size: 1000 },
+        ],
         expiresAt: 123,
-        fileCount: 7,
-        files: [],
-        manifestUrl: "https://api.rendobar.com/v/job_1/tok/_manifest.json",
       },
     });
-    expect(r.output?.kind).toBe("stream");
-    if (r.output?.kind === "stream") {
-      expect(r.output.url).toBe("https://api.rendobar.com/v/job_1/tok/master.m3u8");
-      expect(r.output.manifest).toBe("hls");
-      expect(r.output.fileCount).toBe(7);
-    }
+    expect(r.output?.file?.type).toBe("playlist");
+    expect(r.output?.file?.url).toBe("https://api.rendobar.com/v/job_1/tok/master.m3u8");
+    expect(r.output?.files.length).toBe(2);
   });
 
-  it("reads a set output (no entry url)", () => {
+  it("reads a set output (no headline file, multiple files)", () => {
     const r = buildResult("complete", undefined, {
       output: {
-        kind: "set",
-        baseUrl: "https://api.rendobar.com/v/job_2/tok/",
+        data: null,
+        file: null,
+        files: [
+          { url: "https://api.rendobar.com/v/job_2/tok/a.png", path: "a.png", type: "image", size: 100 },
+          { url: "https://api.rendobar.com/v/job_2/tok/b.png", path: "b.png", type: "image", size: 100 },
+        ],
         expiresAt: 123,
-        fileCount: 120,
-        files: [],
-        manifestUrl: "https://api.rendobar.com/v/job_2/tok/_manifest.json",
       },
     });
-    expect(r.output?.kind).toBe("set");
-    if (r.output?.kind === "set") {
-      expect(r.output.baseUrl).toBe("https://api.rendobar.com/v/job_2/tok/");
-      expect(r.output.fileCount).toBe(120);
-    }
+    expect(r.output?.file).toBeNull();
+    expect(r.output?.files.length).toBe(2);
+    expect(r.output?.files[0]?.path).toBe("a.png");
   });
 
-  it("ignores a malformed output object", () => {
+  it("reads a data-only output (data non-null, no files)", () => {
     const r = buildResult("complete", undefined, {
-      output: { kind: "bogus", baseUrl: 42 },
+      output: {
+        data: { duration: 12.5, streams: 2 },
+        file: null,
+        files: [],
+        expiresAt: null,
+      },
+    });
+    expect(r.output?.data).toEqual({ duration: 12.5, streams: 2 });
+    expect(r.output?.file).toBeNull();
+    expect(r.output?.files.length).toBe(0);
+    expect(r.output?.expiresAt).toBeNull();
+  });
+
+  it("ignores a malformed output object (no files array)", () => {
+    const r = buildResult("complete", undefined, {
+      output: { data: null, file: null },
     });
     expect(r.output).toBeUndefined();
   });
@@ -102,38 +130,45 @@ describe("buildResult — discriminated output", () => {
 });
 
 describe("outputUrl", () => {
-  it("returns the download url for a file", () => {
+  it("returns the headline file url for a single file", () => {
     expect(
       outputUrl({
-        kind: "file",
-        url: "https://cdn.rendobar.com/jobs/job_1/output.mp4",
-        poster: null,
-        meta: {},
+        data: null,
+        file: { url: "https://cdn.rendobar.com/jobs/job_1/output.mp4", path: "output.mp4", type: "video", size: 1 },
+        files: [{ url: "https://cdn.rendobar.com/jobs/job_1/output.mp4", path: "output.mp4", type: "video", size: 1 }],
+        expiresAt: null,
       }),
     ).toBe("https://cdn.rendobar.com/jobs/job_1/output.mp4");
   });
 
-  it("returns the entry playlist for a stream", () => {
+  it("returns the manifest url for a stream", () => {
     expect(
       outputUrl({
-        kind: "stream",
-        url: "https://api.rendobar.com/v/job_1/tok/master.m3u8",
-        manifest: "hls",
-        baseUrl: "https://api.rendobar.com/v/job_1/tok/",
-        fileCount: 7,
-        manifestUrl: "https://api.rendobar.com/v/job_1/tok/_manifest.json",
+        data: null,
+        file: { url: "https://api.rendobar.com/v/job_1/tok/master.m3u8", path: "master.m3u8", type: "playlist", size: 1 },
+        files: [{ url: "https://api.rendobar.com/v/job_1/tok/seg0.ts", path: "seg0.ts", type: "video", size: 1 }],
+        expiresAt: null,
       }),
     ).toBe("https://api.rendobar.com/v/job_1/tok/master.m3u8");
   });
 
-  it("falls back to the base url for a set (no entry url)", () => {
+  it("falls back to the first file url for a set (no headline file)", () => {
     expect(
       outputUrl({
-        kind: "set",
-        baseUrl: "https://api.rendobar.com/v/job_2/tok/",
-        fileCount: 120,
-        manifestUrl: "https://api.rendobar.com/v/job_2/tok/_manifest.json",
+        data: null,
+        file: null,
+        files: [
+          { url: "https://api.rendobar.com/v/job_2/tok/a.png", path: "a.png", type: "image", size: 1 },
+          { url: "https://api.rendobar.com/v/job_2/tok/b.png", path: "b.png", type: "image", size: 1 },
+        ],
+        expiresAt: null,
       }),
-    ).toBe("https://api.rendobar.com/v/job_2/tok/");
+    ).toBe("https://api.rendobar.com/v/job_2/tok/a.png");
+  });
+
+  it("returns undefined for a data-only output (no files)", () => {
+    expect(
+      outputUrl({ data: { ok: true }, file: null, files: [], expiresAt: null }),
+    ).toBeUndefined();
   });
 });
