@@ -13,7 +13,7 @@ import { resolveAuth, refreshTokenIfNeeded, getApiBaseUrl } from "../lib/auth.js
 import { parseFfmpegArgs } from "../lib/parse-ffmpeg-args.js";
 import { shellEscape } from "../lib/shell-escape.js";
 import { uploadLocalFiles } from "../lib/upload.js";
-import { StepRenderer, waitForJob, downloadOutput, servedEntryUrl, type MachineContext } from "../lib/progress.js";
+import { StepRenderer, waitForJob, downloadOutput, outputUrl, type MachineContext } from "../lib/progress.js";
 
 function fmtMs(ms: number): string {
   if (ms < 100) return `${ms}ms`;
@@ -228,10 +228,12 @@ export default defineCommand({
       if (result.status === "failed") {
         if (flags.json) console.log(JSON.stringify(result));
         else if (!flags.quiet) {
-          steps.info(pc.red(`✗ ${result.error ?? "Job failed"}`));
+          const err = result.error;
+          const headline = err ? `${err.code}: ${err.message}` : "Job failed";
+          steps.info(pc.red(`✗ ${headline}`));
           // Surface the ffmpeg stderr tail so failures are debuggable in-place.
-          if (result.errorDetail) {
-            for (const line of result.errorDetail.trimEnd().split("\n")) {
+          if (err?.detail) {
+            for (const line of err.detail.trimEnd().split("\n")) {
               steps.info(pc.dim(line));
             }
           }
@@ -243,31 +245,39 @@ export default defineCommand({
       // ── Output modes ─────────────────────────────────────
       if (flags.json) { console.log(JSON.stringify(result)); process.exit(0); }
       if (flags.urlOnly) {
-        // Served multi-file jobs have no single outputUrl; fall back to the
-        // served entry URL (stream playlist) when present.
-        const url = result.outputUrl ?? (result.output && servedEntryUrl(result.output));
-        if (url) console.log(url);
+        // file/stream → playable url; set → prefix base url.
+        if (result.output) console.log(outputUrl(result.output));
         process.exit(0);
       }
 
       // ── 4. Download output ───────────────────────────────
-      if (parsed.outputFile && result.outputUrl) {
+      const out = result.output;
+      if (parsed.outputFile && out?.kind === "file") {
         const outputPath = path.resolve(parsed.outputFile);
         await steps.step("Saving", async () => {
           return downloadOutput(client, job.id, outputPath);
         });
 
         if (!flags.quiet && isTTY) {
-          process.stderr.write(`\n  ${pc.green("→")} ${pc.bold(parsed.outputFile)}\n`);
+          const dims = out.meta.width && out.meta.height ? ` ${pc.dim(`${out.meta.width}×${out.meta.height}`)}` : "";
+          process.stderr.write(`\n  ${pc.green("→")} ${pc.bold(parsed.outputFile)}${dims}\n`);
           process.stderr.write(`    ${pc.dim(`https://app.rendobar.com/jobs/${job.id}`)}\n`);
         }
-      } else if (result.output && !flags.quiet && isTTY) {
-        // Served multi-file output: no single file to save. Show the served
-        // entry URL plus how many files sit under the prefix.
-        const servedUrl = servedEntryUrl(result.output);
-        const fileLabel = result.output.fileCount === 1 ? "file" : "files";
-        process.stderr.write(`\n  ${pc.green("→")} ${pc.bold(servedUrl)}\n`);
-        process.stderr.write(`    ${pc.dim(`${result.output.fileCount} ${fileLabel}`)}\n`);
+      } else if (out?.kind === "file" && !flags.quiet && isTTY) {
+        // Single output, no local file requested: print its download URL.
+        process.stderr.write(`\n  ${pc.green("→")} ${pc.bold(out.url)}\n`);
+        process.stderr.write(`    ${pc.dim(`https://app.rendobar.com/jobs/${job.id}`)}\n`);
+      } else if (out?.kind === "stream" && !flags.quiet && isTTY) {
+        // HLS/DASH stream: print the playable entry playlist + file count.
+        const fileLabel = out.fileCount === 1 ? "file" : "files";
+        process.stderr.write(`\n  ${pc.green("→")} ${pc.bold(out.url)}\n`);
+        process.stderr.write(`    ${pc.dim(`${out.manifest.toUpperCase()} · ${out.fileCount} ${fileLabel}`)}\n`);
+        process.stderr.write(`    ${pc.dim(`https://app.rendobar.com/jobs/${job.id}`)}\n`);
+      } else if (out?.kind === "set" && !flags.quiet && isTTY) {
+        // Unordered multi-file set: no entry url, print the prefix base + count.
+        const fileLabel = out.fileCount === 1 ? "file" : "files";
+        process.stderr.write(`\n  ${pc.green("→")} ${pc.bold(out.baseUrl)}\n`);
+        process.stderr.write(`    ${pc.dim(`${out.fileCount} ${fileLabel}`)}\n`);
         process.stderr.write(`    ${pc.dim(`https://app.rendobar.com/jobs/${job.id}`)}\n`);
       } else if (!flags.quiet && isTTY) {
         process.stderr.write(`\n    ${pc.dim(`https://app.rendobar.com/jobs/${job.id}`)}\n`);

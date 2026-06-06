@@ -14,12 +14,10 @@ import type { RendobarClient } from "@rendobar/sdk";
 
 export interface ProgressResult {
   status: string;
-  outputUrl?: string;
-  /** Served multi-file output (HLS/DASH, image sequence, resolution ladder). */
-  output?: ServedOutput;
-  error?: string;
-  /** Last ~2 KB of ffmpeg stderr when the job failed at execution. */
-  errorDetail?: string;
+  /** Discriminated job output, present only when status === "complete". */
+  output?: JobOutput;
+  /** Structured failure, present only when status === "failed". */
+  error?: JobError;
   /** Total: Created → Completed */
   duration: number;
   /** Created → Dispatched (API processing + queue dispatch) */
@@ -39,29 +37,71 @@ export interface MachineContext {
 }
 
 /**
- * Served multi-file output. A single ffmpeg job can now emit a token-served
- * prefix (HLS/DASH playlist, image sequence, resolution ladder) instead of one
- * file. The published SDK type may not include this field yet (separate SDK
- * release), so we read it defensively from the runtime job object. Only the
- * fields the CLI renders are modelled here.
+ * Discriminated job output (mirrors the API `Output` union, keyed on `kind`).
+ *
+ * The published `@rendobar/sdk` does not export this union yet (it ships in a
+ * later SDK release), so the CLI narrows the runtime job object defensively
+ * against the same shape. Only the fields the CLI renders are modelled.
+ *
+ *  - file   : single download URL + probe metadata.
+ *  - stream : HLS/DASH playlist (entry url + manifest hint) over a served prefix.
+ *  - set    : unordered multi-file collection over a served prefix (no entry url).
  */
-export interface ServedOutput {
-  /** stream = HLS/DASH playlist; set = unordered multi-file collection. */
-  type: "stream" | "set";
-  /** Primary URL: the entry playlist for a stream; absent for a set. */
-  url?: string;
-  /** Token-in-path serving base URL for the prefix (trailing slash). */
-  baseUrl: string;
-  /** Total number of files under the served prefix. */
-  fileCount: number;
+export type JobOutput =
+  | {
+      kind: "file";
+      url: string;
+      poster: string | null;
+      meta: {
+        format?: string;
+        width?: number;
+        height?: number;
+        durationMs?: number;
+        sizeBytes?: number;
+      };
+    }
+  | {
+      kind: "stream";
+      url: string;
+      manifest: "hls" | "dash";
+      baseUrl: string;
+      fileCount: number;
+      manifestUrl: string;
+    }
+  | {
+      kind: "set";
+      baseUrl: string;
+      fileCount: number;
+      manifestUrl: string;
+    };
+
+/** Structured failure (mirrors the API `error` object). */
+export interface JobError {
+  code: string;
+  message: string;
+  /** Real provider stderr tail (e.g. ffmpeg), or null. */
+  detail: string | null;
+  retryable: boolean;
 }
 
 /**
- * The single URL to surface for a served output: the stream's entry playlist
- * when present, otherwise the prefix base URL (sets have no entry url).
+ * The single playable/download URL for an output: the download URL for a file,
+ * the entry playlist for a stream, the prefix base URL for a set (which has no
+ * entry url). Mirrors the SDK's `outputUrl(job)` helper for sets-vs-not, but
+ * always returns a string so `--url-only` has something to print.
  */
-export function servedEntryUrl(output: ServedOutput): string {
-  return output.url ?? output.baseUrl;
+export function outputUrl(output: JobOutput): string {
+  switch (output.kind) {
+    case "file":
+    case "stream":
+      return output.url;
+    case "set":
+      return output.baseUrl;
+    default: {
+      const _exhaustive: never = output;
+      return _exhaustive;
+    }
+  }
 }
 
 // ── ANSI ───────────────────────────────────────────────────────
@@ -229,10 +269,8 @@ export function buildResult(status: string, machine: MachineContext | undefined,
 
   return {
     status,
-    outputUrl: typeof job.outputUrl === "string" ? job.outputUrl : undefined,
-    output: parseServedOutput(job.output),
-    error: typeof job.errorMessage === "string" ? job.errorMessage : undefined,
-    errorDetail: typeof job.errorDetail === "string" ? job.errorDetail : undefined,
+    output: parseOutput(job.output),
+    error: parseError(job.error),
     duration: totalMs,
     dispatchMs,
     queueMs,
@@ -241,22 +279,98 @@ export function buildResult(status: string, machine: MachineContext | undefined,
   };
 }
 
+function asRecord(raw: unknown): Record<string, unknown> | undefined {
+  return raw && typeof raw === "object" ? (raw as Record<string, unknown>) : undefined;
+}
+
+function optString(v: unknown): string | undefined {
+  return typeof v === "string" ? v : undefined;
+}
+
+function optNumber(v: unknown): number | undefined {
+  return typeof v === "number" ? v : undefined;
+}
+
 /**
  * Narrow an unknown `output` field (from the runtime job object) into the
- * served-output summary the CLI renders. Returns undefined for single-output
- * jobs (no `output` object) or any unexpected shape. The published SDK type may
- * not carry this field yet, so this is read off `Record<string, unknown>`.
+ * discriminated `JobOutput` the CLI renders. Returns undefined when there is no
+ * output (job not complete) or the shape is unexpected. Read off
+ * `Record<string, unknown>` because the published SDK type does not export this
+ * union yet.
  */
-function parseServedOutput(raw: unknown): ServedOutput | undefined {
-  if (!raw || typeof raw !== "object") return undefined;
-  const o = raw as Record<string, unknown>;
-  if (o.type !== "stream" && o.type !== "set") return undefined;
-  if (typeof o.baseUrl !== "string" || typeof o.fileCount !== "number") return undefined;
+function parseOutput(raw: unknown): JobOutput | undefined {
+  const o = asRecord(raw);
+  if (!o) return undefined;
+
+  if (o.kind === "file") {
+    if (typeof o.url !== "string") return undefined;
+    const meta = asRecord(o.meta) ?? {};
+    return {
+      kind: "file",
+      url: o.url,
+      poster: typeof o.poster === "string" ? o.poster : null,
+      meta: {
+        format: optString(meta.format),
+        width: optNumber(meta.width),
+        height: optNumber(meta.height),
+        durationMs: optNumber(meta.durationMs),
+        sizeBytes: optNumber(meta.sizeBytes),
+      },
+    };
+  }
+
+  if (o.kind === "stream") {
+    if (
+      typeof o.url !== "string" ||
+      (o.manifest !== "hls" && o.manifest !== "dash") ||
+      typeof o.baseUrl !== "string" ||
+      typeof o.fileCount !== "number" ||
+      typeof o.manifestUrl !== "string"
+    ) {
+      return undefined;
+    }
+    return {
+      kind: "stream",
+      url: o.url,
+      manifest: o.manifest,
+      baseUrl: o.baseUrl,
+      fileCount: o.fileCount,
+      manifestUrl: o.manifestUrl,
+    };
+  }
+
+  if (o.kind === "set") {
+    if (
+      typeof o.baseUrl !== "string" ||
+      typeof o.fileCount !== "number" ||
+      typeof o.manifestUrl !== "string"
+    ) {
+      return undefined;
+    }
+    return {
+      kind: "set",
+      baseUrl: o.baseUrl,
+      fileCount: o.fileCount,
+      manifestUrl: o.manifestUrl,
+    };
+  }
+
+  return undefined;
+}
+
+/**
+ * Narrow an unknown `error` field into the structured `JobError` the CLI
+ * renders. Returns undefined when the shape is unexpected (e.g. no error).
+ */
+function parseError(raw: unknown): JobError | undefined {
+  const o = asRecord(raw);
+  if (!o) return undefined;
+  if (typeof o.code !== "string" || typeof o.message !== "string") return undefined;
   return {
-    type: o.type,
-    url: typeof o.url === "string" ? o.url : undefined,
-    baseUrl: o.baseUrl,
-    fileCount: o.fileCount,
+    code: o.code,
+    message: o.message,
+    detail: typeof o.detail === "string" ? o.detail : null,
+    retryable: o.retryable === true,
   };
 }
 
