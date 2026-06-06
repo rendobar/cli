@@ -56,6 +56,14 @@ export interface ServedOutput {
   fileCount: number;
 }
 
+/**
+ * The single URL to surface for a served output: the stream's entry playlist
+ * when present, otherwise the prefix base URL (sets have no entry url).
+ */
+export function servedEntryUrl(output: ServedOutput): string {
+  return output.url ?? output.baseUrl;
+}
+
 // ── ANSI ───────────────────────────────────────────────────────
 
 const ESC = "\x1b[";

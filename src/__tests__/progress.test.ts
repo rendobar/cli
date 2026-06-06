@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { buildResult } from "../lib/progress.js";
+import { buildResult, servedEntryUrl } from "../lib/progress.js";
 
 describe("buildResult — served output + errorDetail", () => {
   it("reads a single-file outputUrl", () => {
@@ -67,5 +67,28 @@ describe("buildResult — served output + errorDetail", () => {
   it("leaves errorDetail undefined when absent", () => {
     const r = buildResult("failed", undefined, { errorMessage: "Job failed" });
     expect(r.errorDetail).toBeUndefined();
+  });
+});
+
+describe("servedEntryUrl", () => {
+  it("prefers the stream entry url when present", () => {
+    expect(
+      servedEntryUrl({
+        type: "stream",
+        url: "https://api.rendobar.com/v/job_1/tok/master.m3u8",
+        baseUrl: "https://api.rendobar.com/v/job_1/tok/",
+        fileCount: 7,
+      }),
+    ).toBe("https://api.rendobar.com/v/job_1/tok/master.m3u8");
+  });
+
+  it("falls back to the base url for a set (no entry url)", () => {
+    expect(
+      servedEntryUrl({
+        type: "set",
+        baseUrl: "https://api.rendobar.com/v/job_2/tok/",
+        fileCount: 120,
+      }),
+    ).toBe("https://api.rendobar.com/v/job_2/tok/");
   });
 });

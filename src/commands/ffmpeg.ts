@@ -13,7 +13,7 @@ import { resolveAuth, refreshTokenIfNeeded, getApiBaseUrl } from "../lib/auth.js
 import { parseFfmpegArgs } from "../lib/parse-ffmpeg-args.js";
 import { shellEscape } from "../lib/shell-escape.js";
 import { uploadLocalFiles } from "../lib/upload.js";
-import { StepRenderer, waitForJob, downloadOutput, type MachineContext } from "../lib/progress.js";
+import { StepRenderer, waitForJob, downloadOutput, servedEntryUrl, type MachineContext } from "../lib/progress.js";
 
 function fmtMs(ms: number): string {
   if (ms < 100) return `${ms}ms`;
@@ -245,7 +245,7 @@ export default defineCommand({
       if (flags.urlOnly) {
         // Served multi-file jobs have no single outputUrl; fall back to the
         // served entry URL (stream playlist) when present.
-        const url = result.outputUrl ?? result.output?.url ?? result.output?.baseUrl;
+        const url = result.outputUrl ?? (result.output && servedEntryUrl(result.output));
         if (url) console.log(url);
         process.exit(0);
       }
@@ -264,7 +264,7 @@ export default defineCommand({
       } else if (result.output && !flags.quiet && isTTY) {
         // Served multi-file output: no single file to save. Show the served
         // entry URL plus how many files sit under the prefix.
-        const servedUrl = result.output.url ?? result.output.baseUrl;
+        const servedUrl = servedEntryUrl(result.output);
         const fileLabel = result.output.fileCount === 1 ? "file" : "files";
         process.stderr.write(`\n  ${pc.green("→")} ${pc.bold(servedUrl)}\n`);
         process.stderr.write(`    ${pc.dim(`${result.output.fileCount} ${fileLabel}`)}\n`);
