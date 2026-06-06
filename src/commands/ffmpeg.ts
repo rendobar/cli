@@ -227,14 +227,28 @@ export default defineCommand({
       // ── Handle failure ───────────────────────────────────
       if (result.status === "failed") {
         if (flags.json) console.log(JSON.stringify(result));
-        else if (!flags.quiet) steps.info(pc.red(`✗ ${result.error ?? "Job failed"}`));
+        else if (!flags.quiet) {
+          steps.info(pc.red(`✗ ${result.error ?? "Job failed"}`));
+          // Surface the ffmpeg stderr tail so failures are debuggable in-place.
+          if (result.errorDetail) {
+            for (const line of result.errorDetail.trimEnd().split("\n")) {
+              steps.info(pc.dim(line));
+            }
+          }
+        }
         process.exit(1);
       }
       if (result.status === "cancelled") process.exit(130);
 
       // ── Output modes ─────────────────────────────────────
       if (flags.json) { console.log(JSON.stringify(result)); process.exit(0); }
-      if (flags.urlOnly) { if (result.outputUrl) console.log(result.outputUrl); process.exit(0); }
+      if (flags.urlOnly) {
+        // Served multi-file jobs have no single outputUrl; fall back to the
+        // served entry URL (stream playlist) when present.
+        const url = result.outputUrl ?? result.output?.url ?? result.output?.baseUrl;
+        if (url) console.log(url);
+        process.exit(0);
+      }
 
       // ── 4. Download output ───────────────────────────────
       if (parsed.outputFile && result.outputUrl) {
@@ -247,6 +261,14 @@ export default defineCommand({
           process.stderr.write(`\n  ${pc.green("→")} ${pc.bold(parsed.outputFile)}\n`);
           process.stderr.write(`    ${pc.dim(`https://app.rendobar.com/jobs/${job.id}`)}\n`);
         }
+      } else if (result.output && !flags.quiet && isTTY) {
+        // Served multi-file output: no single file to save. Show the served
+        // entry URL plus how many files sit under the prefix.
+        const servedUrl = result.output.url ?? result.output.baseUrl;
+        const fileLabel = result.output.fileCount === 1 ? "file" : "files";
+        process.stderr.write(`\n  ${pc.green("→")} ${pc.bold(servedUrl)}\n`);
+        process.stderr.write(`    ${pc.dim(`${result.output.fileCount} ${fileLabel}`)}\n`);
+        process.stderr.write(`    ${pc.dim(`https://app.rendobar.com/jobs/${job.id}`)}\n`);
       } else if (!flags.quiet && isTTY) {
         process.stderr.write(`\n    ${pc.dim(`https://app.rendobar.com/jobs/${job.id}`)}\n`);
       }

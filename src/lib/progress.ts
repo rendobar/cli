@@ -15,7 +15,11 @@ import type { RendobarClient } from "@rendobar/sdk";
 export interface ProgressResult {
   status: string;
   outputUrl?: string;
+  /** Served multi-file output (HLS/DASH, image sequence, resolution ladder). */
+  output?: ServedOutput;
   error?: string;
+  /** Last ~2 KB of ffmpeg stderr when the job failed at execution. */
+  errorDetail?: string;
   /** Total: Created → Completed */
   duration: number;
   /** Created → Dispatched (API processing + queue dispatch) */
@@ -32,6 +36,24 @@ export interface MachineContext {
   cpu: number;
   memory: number;
   region?: string;
+}
+
+/**
+ * Served multi-file output. A single ffmpeg job can now emit a token-served
+ * prefix (HLS/DASH playlist, image sequence, resolution ladder) instead of one
+ * file. The published SDK type may not include this field yet (separate SDK
+ * release), so we read it defensively from the runtime job object. Only the
+ * fields the CLI renders are modelled here.
+ */
+export interface ServedOutput {
+  /** stream = HLS/DASH playlist; set = unordered multi-file collection. */
+  type: "stream" | "set";
+  /** Primary URL: the entry playlist for a stream; absent for a set. */
+  url?: string;
+  /** Token-in-path serving base URL for the prefix (trailing slash). */
+  baseUrl: string;
+  /** Total number of files under the served prefix. */
+  fileCount: number;
 }
 
 // ── ANSI ───────────────────────────────────────────────────────
@@ -182,7 +204,7 @@ interface WsResult {
   machine?: MachineContext;
 }
 
-function buildResult(status: string, machine: MachineContext | undefined, job: Record<string, unknown>): ProgressResult {
+export function buildResult(status: string, machine: MachineContext | undefined, job: Record<string, unknown>): ProgressResult {
   const createdAt = typeof job.createdAt === "number" ? job.createdAt : 0;
   const dispatchedAt = typeof job.dispatchedAt === "number" ? job.dispatchedAt : 0;
   const startedAt = typeof job.startedAt === "number" ? job.startedAt : 0;
@@ -200,12 +222,33 @@ function buildResult(status: string, machine: MachineContext | undefined, job: R
   return {
     status,
     outputUrl: typeof job.outputUrl === "string" ? job.outputUrl : undefined,
+    output: parseServedOutput(job.output),
     error: typeof job.errorMessage === "string" ? job.errorMessage : undefined,
+    errorDetail: typeof job.errorDetail === "string" ? job.errorDetail : undefined,
     duration: totalMs,
     dispatchMs,
     queueMs,
     execMs,
     machine,
+  };
+}
+
+/**
+ * Narrow an unknown `output` field (from the runtime job object) into the
+ * served-output summary the CLI renders. Returns undefined for single-output
+ * jobs (no `output` object) or any unexpected shape. The published SDK type may
+ * not carry this field yet, so this is read off `Record<string, unknown>`.
+ */
+function parseServedOutput(raw: unknown): ServedOutput | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const o = raw as Record<string, unknown>;
+  if (o.type !== "stream" && o.type !== "set") return undefined;
+  if (typeof o.baseUrl !== "string" || typeof o.fileCount !== "number") return undefined;
+  return {
+    type: o.type,
+    url: typeof o.url === "string" ? o.url : undefined,
+    baseUrl: o.baseUrl,
+    fileCount: o.fileCount,
   };
 }
 
