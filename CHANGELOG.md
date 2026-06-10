@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.4](https://github.com/rendobar/cli/compare/v1.3.3...v1.3.4) (2026-06-10)
+
+
+### Bug Fixes
+
+* adopt @rendobar/sdk v3 upload API ([#46](https://github.com/rendobar/cli/issues/46))
+
 ## [1.3.3](https://github.com/rendobar/cli/compare/v1.3.2...v1.3.3) (2026-06-06)
 
 

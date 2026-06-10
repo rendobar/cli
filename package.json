@@ -1,6 +1,6 @@
 {
   "name": "rendobar-cli",
-  "version": "1.3.3",
+  "version": "1.3.4",
   "private": true,
   "description": "Rendobar CLI — serverless video processing from your terminal.",
   "license": "MIT",
