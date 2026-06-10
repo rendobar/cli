@@ -23,8 +23,8 @@ describe("uploadLocalFiles", () => {
 
   it("uploads local files and replaces paths in args", async () => {
     const localPath = createTempFile("video.mp4");
-    const mockUpload = mock(() => Promise.resolve({ downloadUrl: "https://cdn.rendobar.com/uploads/abc123.mp4" }));
-    const mockClient = { uploads: { upload: mockUpload } } as unknown as Parameters<typeof uploadLocalFiles>[2];
+    const mockUpload = mock(() => Promise.resolve({ url: "https://cdn.rendobar.com/uploads/abc123.mp4" }));
+    const mockClient = { uploads: { create: mockUpload } } as unknown as Parameters<typeof uploadLocalFiles>[2];
 
     const args = ["-i", localPath, "-vf", "scale=1280:720", "output.mp4"];
     const inputs = [{ index: 1, value: localPath, isLocal: true }];
@@ -43,9 +43,9 @@ describe("uploadLocalFiles", () => {
     let callCount = 0;
     const mockUpload = mock(async () => {
       callCount++;
-      return { downloadUrl: `https://cdn.rendobar.com/uploads/file${callCount}.mp4` };
+      return { url: `https://cdn.rendobar.com/uploads/file${callCount}.mp4` };
     });
-    const mockClient = { uploads: { upload: mockUpload } } as unknown as Parameters<typeof uploadLocalFiles>[2];
+    const mockClient = { uploads: { create: mockUpload } } as unknown as Parameters<typeof uploadLocalFiles>[2];
 
     const args = ["-i", pathA, "-i", pathB, "output.mp4"];
     const inputs = [
@@ -61,8 +61,8 @@ describe("uploadLocalFiles", () => {
   });
 
   it("skips URL inputs (no upload needed)", async () => {
-    const mockUpload = mock(() => Promise.resolve({ downloadUrl: "" }));
-    const mockClient = { uploads: { upload: mockUpload } } as unknown as Parameters<typeof uploadLocalFiles>[2];
+    const mockUpload = mock(() => Promise.resolve({ url: "" }));
+    const mockClient = { uploads: { create: mockUpload } } as unknown as Parameters<typeof uploadLocalFiles>[2];
 
     const args = ["-i", "https://example.com/video.mp4", "output.mp4"];
     const inputs = [{ index: 1, value: "https://example.com/video.mp4", isLocal: false }];
@@ -74,8 +74,8 @@ describe("uploadLocalFiles", () => {
   });
 
   it("throws when local file does not exist", async () => {
-    const mockUpload = mock(() => Promise.resolve({ downloadUrl: "" }));
-    const mockClient = { uploads: { upload: mockUpload } } as unknown as Parameters<typeof uploadLocalFiles>[2];
+    const mockUpload = mock(() => Promise.resolve({ url: "" }));
+    const mockClient = { uploads: { create: mockUpload } } as unknown as Parameters<typeof uploadLocalFiles>[2];
 
     const args = ["-i", "/nonexistent/file.mp4", "output.mp4"];
     const inputs = [{ index: 1, value: "/nonexistent/file.mp4", isLocal: true }];

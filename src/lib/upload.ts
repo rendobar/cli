@@ -35,10 +35,10 @@ export async function uploadLocalFiles(
     const filename = path.basename(input.value);
 
     callbacks?.onFileStart?.(filename, file.size, i, total);
-    const { downloadUrl } = await client.uploads.upload(new Uint8Array(buffer), { filename });
+    const asset = await client.uploads.create(new Uint8Array(buffer), { filename });
     callbacks?.onFileDone?.(filename, i, total);
 
-    result[input.index] = downloadUrl;
+    result[input.index] = asset.url;
   }
 
   return result;

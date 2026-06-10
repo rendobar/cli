@@ -35,7 +35,7 @@ describe("ffmpeg command flow", () => {
     const rawArgs = ["-i", localPath, "-vf", "scale=640:480", "output.mp4"];
     const parsed = parseFfmpegArgs(rawArgs);
     const mockClient = {
-      uploads: { upload: mock(() => Promise.resolve({ downloadUrl: "https://cdn.rendobar.com/uploads/abc.mp4" })) },
+      uploads: { create: mock(() => Promise.resolve({ url: "https://cdn.rendobar.com/uploads/abc.mp4" })) },
     } as unknown as Parameters<typeof uploadLocalFiles>[2];
     const rewritten = await uploadLocalFiles(rawArgs, parsed.inputs, mockClient);
     const commandString = "ffmpeg " + rewritten.join(" ");
@@ -52,7 +52,7 @@ describe("ffmpeg command flow", () => {
     const rawArgs = ["-i", localPath, "-c:v", "libx264", "-crf", "23", "output.mp4"];
     const parsed = parseFfmpegArgs(rawArgs);
     const mockClient = {
-      uploads: { upload: mock(() => Promise.resolve({ downloadUrl: "https://cdn.rendobar.com/uploads/xyz.mp4" })) },
+      uploads: { create: mock(() => Promise.resolve({ url: "https://cdn.rendobar.com/uploads/xyz.mp4" })) },
     } as unknown as Parameters<typeof uploadLocalFiles>[2];
     const rewritten = await uploadLocalFiles(rawArgs, parsed.inputs, mockClient);
 
@@ -78,16 +78,16 @@ describe("ffmpeg command flow", () => {
     let callIdx = 0;
     const mockClient = {
       uploads: {
-        upload: mock(async () => {
+        create: mock(async () => {
           callIdx++;
-          return { downloadUrl: `https://cdn.rendobar.com/uploads/file${callIdx}.mp4` };
+          return { url: `https://cdn.rendobar.com/uploads/file${callIdx}.mp4` };
         }),
       },
     } as unknown as Parameters<typeof uploadLocalFiles>[2];
 
     const rewritten = await uploadLocalFiles(rawArgs, parsed.inputs, mockClient);
 
-    expect(mockClient.uploads.upload).toHaveBeenCalledTimes(2);
+    expect(mockClient.uploads.create).toHaveBeenCalledTimes(2);
     expect(rewritten[1]).toContain("cdn.rendobar.com");
     expect(rewritten[3]).toContain("cdn.rendobar.com");
     // Filter complex preserved
@@ -103,13 +103,13 @@ describe("ffmpeg command flow", () => {
     expect(parsed.inputs[1]!.isLocal).toBe(true);
 
     const mockClient = {
-      uploads: { upload: mock(() => Promise.resolve({ downloadUrl: "https://cdn.rendobar.com/uploads/local.png" })) },
+      uploads: { create: mock(() => Promise.resolve({ url: "https://cdn.rendobar.com/uploads/local.png" })) },
     } as unknown as Parameters<typeof uploadLocalFiles>[2];
 
     const rewritten = await uploadLocalFiles(rawArgs, parsed.inputs, mockClient);
 
     // Only one upload call (the local file)
-    expect(mockClient.uploads.upload).toHaveBeenCalledTimes(1);
+    expect(mockClient.uploads.create).toHaveBeenCalledTimes(1);
     // Remote URL preserved
     expect(rewritten[1]).toBe("https://example.com/bg.mp4");
     // Local file replaced
