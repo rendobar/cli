@@ -12,8 +12,8 @@ importers:
         specifier: ^1.2.0
         version: 1.5.1
       '@rendobar/sdk':
-        specifier: ^3.0.0
-        version: 3.0.0
+        specifier: ^3.0.1
+        version: 3.0.1
       citty:
         specifier: ^0.2.0
         version: 0.2.2
@@ -136,8 +136,8 @@ packages:
       conventional-commits-parser:
         optional: true
 
-  '@rendobar/sdk@3.0.0':
-    resolution: {integrity: sha512-i9RrML7qq7E0j9Tl4oT8QIt5lizwYE+9sqdq7PESE/zcrLYA+/YuMcBF1fMmhKtOHAsEdgzzpGGLIZQjSdBrSw==}
+  '@rendobar/sdk@3.0.1':
+    resolution: {integrity: sha512-pYN6I8EeDNZqTywaDEln78bMZkoJsEOQH46BLjan1u89qoo9xyCHEjomswQU687gePXLZkMI+4VzH6qzjNVEyw==}
     engines: {node: '>=18'}
 
   '@simple-libs/child-process-utils@1.0.2':
@@ -379,8 +379,8 @@ packages:
     resolution: {integrity: sha512-ayCKvm/phCGxOkYRSCM82iDwct8/EonSEgCSxWxD7ve6jHggsFl4fZVQBPRNgQoKiuV/odhFrGzQXZwbifC8Rg==}
     engines: {node: '>=8'}
 
-  partysocket@1.1.16:
-    resolution: {integrity: sha512-d7xFv+ZC7x0p/DAHWJ5FhxQhimIx+ucyZY+kxL0cKddLBmK9c4p2tEA/L+dOOrWm6EYrRwrBjKQV0uSzOY9x1w==}
+  partysocket@1.1.19:
+    resolution: {integrity: sha512-hPwsXSdUc8PKNCinET6TD3JQOxzQ2JaP0bUZQXBVl6UM8UuLn1odgf1LcJXHy4UHSQwWL/RU3AnyhEsGM+W+sg==}
     peerDependencies:
       react: '>=17'
     peerDependenciesMeta:
@@ -584,9 +584,9 @@ snapshots:
     optionalDependencies:
       conventional-commits-parser: 6.4.0
 
-  '@rendobar/sdk@3.0.0':
+  '@rendobar/sdk@3.0.1':
     dependencies:
-      partysocket: 1.1.16
+      partysocket: 1.1.19
     transitivePeerDependencies:
       - react
 
@@ -798,7 +798,7 @@ snapshots:
       json-parse-even-better-errors: 2.3.1
       lines-and-columns: 1.2.4
 
-  partysocket@1.1.16:
+  partysocket@1.1.19:
     dependencies:
       event-target-polyfill: 0.0.4
 
