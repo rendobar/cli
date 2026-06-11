@@ -26,10 +26,10 @@
     "check:no-linked-sdk": "node scripts/check-no-linked-sdk.mjs"
   },
   "dependencies": {
-    "@rendobar/sdk": "^3.0.0",
+    "@clack/prompts": "^1.2.0",
+    "@rendobar/sdk": "^3.0.1",
     "citty": "^0.2.0",
-    "picocolors": "^1.1.1",
-    "@clack/prompts": "^1.2.0"
+    "picocolors": "^1.1.1"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.0.0",

@@ -4,6 +4,7 @@ import type { ParsedInput } from "./parse-ffmpeg-args.js";
 
 export interface UploadCallbacks {
   onFileStart?: (filename: string, size: number, index: number, total: number) => void;
+  onFileProgress?: (filename: string, loaded: number, size: number, index: number, total: number) => void;
   onFileDone?: (filename: string, index: number, total: number) => void;
 }
 
@@ -34,8 +35,17 @@ export async function uploadLocalFiles(
     const buffer = await file.arrayBuffer();
     const filename = path.basename(input.value);
 
+    // sha256 enables server-side dedup: re-uploading the same bytes skips the
+    // transfer entirely (the API returns the existing ready asset).
+    const checksum = new Bun.CryptoHasher("sha256").update(buffer).digest("hex");
+
     callbacks?.onFileStart?.(filename, file.size, i, total);
-    const asset = await client.uploads.create(new Uint8Array(buffer), { filename });
+    const asset = await client.uploads.create(new Uint8Array(buffer), {
+      filename,
+      checksum,
+      onProgress: ({ loaded, total: size }) =>
+        callbacks?.onFileProgress?.(filename, loaded, size, i, total),
+    });
     callbacks?.onFileDone?.(filename, i, total);
 
     result[input.index] = asset.url;
