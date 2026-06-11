@@ -22,14 +22,14 @@ jobs:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
         with:
           fetch-depth: 0
-          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          token: ${{ secrets.ORG_AUTOMATION_PAT }}
 
       - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7  # v5.0.0
         id: release
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
-          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          token: ${{ secrets.ORG_AUTOMATION_PAT }}
           # release-please's own github-release step cannot match this
           # single-root-package repo's merged release PR: getBranchComponent()
           # resolves to the package name ("rendobar-cli") while the merged PR
@@ -46,7 +46,7 @@ jobs:
       - name: Enable auto-merge on release PR
         if: steps.release.outputs.pr
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          GH_TOKEN: ${{ secrets.ORG_AUTOMATION_PAT }}
         run: |
           PR_NUMBER=$(echo '${{ steps.release.outputs.pr }}' | node -e "
             let d = '';
@@ -62,7 +62,7 @@ jobs:
       - name: Tag released version
         if: ${{ !steps.release.outputs.pr }}
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          GH_TOKEN: ${{ secrets.ORG_AUTOMATION_PAT }}
         run: |
           SUBJECT=$(git log -1 --pretty=%s)
           case "$SUBJECT" in
