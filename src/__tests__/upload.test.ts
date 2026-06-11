@@ -82,4 +82,43 @@ describe("uploadLocalFiles", () => {
 
     await expect(uploadLocalFiles(args, inputs, mockClient)).rejects.toThrow("File not found");
   });
+
+  it("passes the file's sha256 checksum so the server can dedup", async () => {
+    const localPath = createTempFile("video.mp4", "fake");
+    const mockUpload = mock((_data: Uint8Array, _options: { checksum?: string }) =>
+      Promise.resolve({ url: "https://cdn.rendobar.com/uploads/abc.mp4" }),
+    );
+    const mockClient = { uploads: { create: mockUpload } } as unknown as Parameters<typeof uploadLocalFiles>[2];
+
+    await uploadLocalFiles(["-i", localPath, "out.mp4"], [{ index: 1, value: localPath, isLocal: true }], mockClient);
+
+    // Hash of the same content, computed independently of the code under test.
+    const expected = new Bun.CryptoHasher("sha256").update("fake").digest("hex");
+    expect(mockUpload.mock.calls[0]![1].checksum).toBe(expected);
+  });
+
+  it("forwards SDK progress events to onFileProgress with file context", async () => {
+    const localPath = createTempFile("video.mp4", "fake-bytes");
+    const mockUpload = mock(
+      async (_data: Uint8Array, options: { onProgress?: (p: { loaded: number; total: number }) => void }) => {
+        options.onProgress?.({ loaded: 5, total: 10 });
+        options.onProgress?.({ loaded: 10, total: 10 });
+        return { url: "https://cdn.rendobar.com/uploads/abc.mp4" };
+      },
+    );
+    const mockClient = { uploads: { create: mockUpload } } as unknown as Parameters<typeof uploadLocalFiles>[2];
+
+    const events: unknown[][] = [];
+    await uploadLocalFiles(
+      ["-i", localPath, "out.mp4"],
+      [{ index: 1, value: localPath, isLocal: true }],
+      mockClient,
+      { onFileProgress: (...args) => events.push(args) },
+    );
+
+    expect(events).toEqual([
+      ["video.mp4", 5, 10, 0, 1],
+      ["video.mp4", 10, 10, 0, 1],
+    ]);
+  });
 });

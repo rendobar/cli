@@ -19,6 +19,7 @@ import {
   downloadUrlToFile,
   downloadFilesToDir,
   outputUrl,
+  fmtBytes,
   type MachineContext,
 } from "../lib/progress.js";
 
@@ -199,8 +200,15 @@ export default defineCommand({
       const localInputs = parsed.inputs.filter((i) => i.isLocal);
 
       if (localInputs.length > 0) {
-        rewrittenArgs = await steps.step("Uploading", async () => {
-          return uploadLocalFiles(ffmpegArgs, parsed.inputs, client);
+        rewrittenArgs = await steps.step("Uploading", async (update) => {
+          const filePrefix = (index: number, count: number) =>
+            count > 1 ? `${index + 1}/${count} ` : "";
+          return uploadLocalFiles(ffmpegArgs, parsed.inputs, client, {
+            onFileStart: (filename, size, index, count) =>
+              update(`${filePrefix(index, count)}${filename} · ${fmtBytes(size)}`),
+            onFileProgress: (filename, loaded, size, index, count) =>
+              update(`${filePrefix(index, count)}${filename} · ${fmtBytes(loaded)} / ${fmtBytes(size)}`),
+          });
         });
       }
 
