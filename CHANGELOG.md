@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.0](https://github.com/rendobar/cli/compare/v1.3.4...v1.4.0) (2026-06-11)
+
+
+### Features
+
+* show upload progress and skip re-uploads via checksum dedup ([#53](https://github.com/rendobar/cli/issues/53)) ([43f6bb1](https://github.com/rendobar/cli/commit/43f6bb1b6d9c3105f4d19c8f2a01ebd4b636caed))
+
 ## [1.3.4](https://github.com/rendobar/cli/compare/v1.3.3...v1.3.4) (2026-06-10)
 
 
