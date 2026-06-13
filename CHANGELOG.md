@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.0](https://github.com/rendobar/cli/compare/v1.4.0...v1.5.0) (2026-06-13)
+
+
+### Features
+
+* add --compute flag for gpu encoding ([#57](https://github.com/rendobar/cli/issues/57)) ([c6cb3b6](https://github.com/rendobar/cli/commit/c6cb3b6a3ca3f381bd89c3a319a8fe6eb41c2d35))
+
 ## [1.4.0](https://github.com/rendobar/cli/compare/v1.3.4...v1.4.0) (2026-06-11)
 
 
