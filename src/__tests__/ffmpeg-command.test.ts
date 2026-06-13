@@ -128,3 +128,47 @@ describe("ffmpeg command flow", () => {
     expect(commandString).toBe("ffmpeg -i https://cdn.rendobar.com/video.mp4 -c:v libx264 -preset fast -vf scale=1920:1080 output.mp4");
   });
 });
+
+// ── --compute flag → submit params ─────────────────────────────
+//
+// Mirrors how `rb ffmpeg` constructs the job params object: `compute` is only
+// included when the user passed a value, and that value is validated against
+// auto|cpu|gpu before submission.
+
+type Compute = "auto" | "cpu" | "gpu";
+
+function isCompute(value: string): value is Compute {
+  return value === "auto" || value === "cpu" || value === "gpu";
+}
+
+function buildParams(command: string, timeout: number, compute: Compute | null): Record<string, unknown> {
+  return { command, timeout, ...(compute ? { compute } : {}) };
+}
+
+describe("ffmpeg --compute flag", () => {
+  it("includes compute in params when --compute gpu is passed", () => {
+    const compute = "gpu";
+    expect(isCompute(compute)).toBe(true);
+    const params = buildParams("ffmpeg -i in.mp4 out.mp4", 120, compute);
+    expect(params.compute).toBe("gpu");
+  });
+
+  it("accepts auto and cpu as valid compute modes", () => {
+    expect(isCompute("auto")).toBe(true);
+    expect(isCompute("cpu")).toBe(true);
+    expect(buildParams("ffmpeg -i in.mp4 out.mp4", 120, "cpu").compute).toBe("cpu");
+  });
+
+  it("rejects an invalid compute value", () => {
+    expect(isCompute("turbo")).toBe(false);
+    expect(isCompute("GPU")).toBe(false);
+    expect(isCompute("")).toBe(false);
+  });
+
+  it("omits compute from params when no --compute flag is passed", () => {
+    const params = buildParams("ffmpeg -i in.mp4 out.mp4", 120, null);
+    expect("compute" in params).toBe(false);
+    expect(params.command).toBe("ffmpeg -i in.mp4 out.mp4");
+    expect(params.timeout).toBe(120);
+  });
+});

@@ -53,6 +53,13 @@ function localManifestPath(written: string[], manifestRemotePath: string): strin
 
 // ── Flags ──────────────────────────────────────────────────────
 
+type Compute = "auto" | "cpu" | "gpu";
+const COMPUTE_MODES: readonly Compute[] = ["auto", "cpu", "gpu"];
+
+function isCompute(value: string): value is Compute {
+  return (COMPUTE_MODES as readonly string[]).includes(value);
+}
+
 interface GlobalFlags {
   json: boolean;
   urlOnly: boolean;
@@ -62,6 +69,7 @@ interface GlobalFlags {
   output: string | null;
   outputDir: string | null;
   timeout: number;
+  compute: Compute | null;
 }
 
 function extractGlobalFlags(): GlobalFlags {
@@ -75,6 +83,7 @@ function extractGlobalFlags(): GlobalFlags {
     output: null,
     outputDir: null,
     timeout: 120,
+    compute: null,
   };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -94,6 +103,14 @@ function extractGlobalFlags(): GlobalFlags {
       const val = parseInt(argv[i + 1]!, 10);
       if (!Number.isNaN(val) && val > 0) flags.timeout = Math.min(val, 900);
       i++;
+    } else if (arg === "--compute" && i + 1 < argv.length) {
+      const val = argv[i + 1]!; // Guarded by i + 1 < argv.length
+      if (!isCompute(val)) {
+        process.stderr.write(pc.red(`  ✗ Invalid --compute value "${val}". Expected one of: auto, cpu, gpu.\n`));
+        process.exit(2);
+      }
+      flags.compute = val;
+      i++;
     }
   }
   return flags;
@@ -104,7 +121,7 @@ function extractFfmpegArgs(): string[] {
   const ffmpegIdx = argv.indexOf("ffmpeg");
   if (ffmpegIdx === -1) return [];
   const globalFlags = new Set(["--json", "--url-only", "--quiet", "--no-wait", "--no-download"]);
-  const globalFlagsWithValue = new Set(["--timeout", "--output", "--output-dir"]);
+  const globalFlagsWithValue = new Set(["--timeout", "--output", "--output-dir", "--compute"]);
   const result: string[] = [];
   for (let i = ffmpegIdx + 1; i < argv.length; i++) {
     const arg = argv[i]!;
@@ -135,6 +152,7 @@ ${pc.bold("Flags:")}
   --quiet             No output, exit code only
   --no-wait           Submit and exit immediately (prints job ID)
   --timeout N         Max execution time in seconds (default: 120, max: 900)
+  --compute <mode>    Run on cpu or gpu hardware (auto, cpu, gpu; gpu needs Pro)
 
 ${pc.dim("Outputs download to your folder by default — like running ffmpeg locally.")}
 ${pc.dim("Local files are auto-uploaded before job submission.")}
@@ -224,7 +242,10 @@ export default defineCommand({
 
       const job = await steps.step("Submitting", async () => {
         return client.jobs.create(
-          { type: "ffmpeg", params: { command, timeout: flags.timeout } },
+          {
+            type: "ffmpeg",
+            params: { command, timeout: flags.timeout, ...(flags.compute ? { compute: flags.compute } : {}) },
+          },
           { signal: controller.signal },
         );
       });
