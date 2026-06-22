@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.0](https://github.com/rendobar/cli/compare/v1.5.0...v1.6.0) (2026-06-22)
+
+
+### Miscellaneous
+
+* **deps:** bump @rendobar/sdk to ^3.1.0 ([#65](https://github.com/rendobar/cli/issues/65)) ([1f72f7c](https://github.com/rendobar/cli/commit/1f72f7c26dcece60b2c6dfcf37f9754389ec1927))
+
 ## [1.5.0](https://github.com/rendobar/cli/compare/v1.4.0...v1.5.0) (2026-06-13)
 
 
