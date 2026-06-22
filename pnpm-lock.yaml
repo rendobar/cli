@@ -12,8 +12,8 @@ importers:
         specifier: ^1.2.0
         version: 1.6.0
       '@rendobar/sdk':
-        specifier: ^3.0.1
-        version: 3.0.1
+        specifier: ^3.1.0
+        version: 3.1.0
       citty:
         specifier: ^0.2.0
         version: 0.2.2
@@ -136,8 +136,8 @@ packages:
       conventional-commits-parser:
         optional: true
 
-  '@rendobar/sdk@3.0.1':
-    resolution: {integrity: sha512-pYN6I8EeDNZqTywaDEln78bMZkoJsEOQH46BLjan1u89qoo9xyCHEjomswQU687gePXLZkMI+4VzH6qzjNVEyw==}
+  '@rendobar/sdk@3.1.0':
+    resolution: {integrity: sha512-mmwiILyuoKeffHh6bwsofuxU5JdCBjtxH4vNN7fEgQzBij2WgLHcFPCMBz4Nltn41RYsNFaOAOmU/ZbLEqeyjQ==}
     engines: {node: '>=18'}
 
   '@simple-libs/child-process-utils@1.0.2':
@@ -584,7 +584,7 @@ snapshots:
     optionalDependencies:
       conventional-commits-parser: 6.4.0
 
-  '@rendobar/sdk@3.0.1':
+  '@rendobar/sdk@3.1.0':
     dependencies:
       partysocket: 1.1.19
     transitivePeerDependencies:
