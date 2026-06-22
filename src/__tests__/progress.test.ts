@@ -106,13 +106,13 @@ describe("buildResult — unified output", () => {
   it("surfaces a structured error (code + message + detail) on failure", () => {
     const r = buildResult("failed", undefined, {
       error: {
-        code: "PROVIDER_ERROR",
+        code: "RUNNER_ERROR",
         message: "Job failed",
         detail: "frame= 100\n[error] Conversion failed!",
         retryable: false,
       },
     });
-    expect(r.error?.code).toBe("PROVIDER_ERROR");
+    expect(r.error?.code).toBe("RUNNER_ERROR");
     expect(r.error?.message).toBe("Job failed");
     expect(r.error?.detail).toContain("Conversion failed!");
     expect(r.error?.retryable).toBe(false);
