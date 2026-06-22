@@ -156,7 +156,7 @@ ${pc.bold("Flags:")}
 
 ${pc.dim("Outputs download to your folder by default — like running ffmpeg locally.")}
 ${pc.dim("Local files are auto-uploaded before job submission.")}
-${pc.dim("All FFmpeg flags are passed through to the cloud executor.")}
+${pc.dim("All FFmpeg flags are passed through to the cloud runner.")}
 `);
 }
 
@@ -259,7 +259,7 @@ export default defineCommand({
       }
 
       // ── 3. Wait for cloud execution ──────────────────────
-      // Phase 1: "Queued" spinner until job.context arrives (executor started)
+      // Phase 1: "Queued" spinner until job.context arrives (runner started)
       // Phase 2: "Executing" spinner with machine specs until completion
       // Final: replace spinner with server-timed "Executed" line
       let machine: MachineContext | undefined;
@@ -276,7 +276,7 @@ export default defineCommand({
         signal: controller.signal,
         onContext(ctx) {
           machine = ctx;
-          // job.context = executor started = queue phase over
+          // job.context = runner started = queue phase over
           // Print "Queued ✓" with elapsed time, start "Executing" spinner
           const queuedElapsed = Date.now() - queuedStart;
           steps.stopSpinnerRaw();

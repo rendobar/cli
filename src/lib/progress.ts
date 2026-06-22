@@ -24,7 +24,7 @@ export interface ProgressResult {
   duration: number;
   /** Created → Dispatched (API processing + queue dispatch) */
   dispatchMs: number;
-  /** Dispatched → Started (waiting for executor machine) */
+  /** Dispatched → Started (waiting for runner machine) */
   queueMs: number;
   /** Started → Completed (actual execution) */
   execMs: number;
@@ -253,7 +253,7 @@ export function buildResult(status: string, machine: MachineContext | undefined,
 
   // Dispatch time: Created → Dispatched (API processing + queue dispatch)
   const dispatchMs = dispatchedAt && createdAt ? dispatchedAt - createdAt : 0;
-  // Queue time: Dispatched → Started (waiting for executor machine)
+  // Queue time: Dispatched → Started (waiting for runner machine)
   const queueMs = startedAt && dispatchedAt ? startedAt - dispatchedAt : 0;
   // Execution time: Started → Completed (FFmpeg running)
   const execMs = completedAt && startedAt ? completedAt - startedAt : 0;
