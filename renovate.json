@@ -32,6 +32,14 @@
     {
       "matchPackageNames": ["bun", "oven-sh/setup-bun"],
       "groupName": "bun"
+    },
+    {
+      "matchPackageNames": ["@rendobar/**"],
+      "matchUpdateTypes": ["patch", "minor"],
+      "schedule": ["at any time"],
+      "automerge": true,
+      "platformAutomerge": true,
+      "groupName": "rendobar internal deps"
     }
   ],
   "dependencyDashboard": true,
