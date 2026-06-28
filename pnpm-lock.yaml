@@ -13,7 +13,7 @@ importers:
         version: 1.6.0
       '@rendobar/sdk':
         specifier: ^3.1.0
-        version: 3.1.0
+        version: 3.3.0
       citty:
         specifier: ^0.2.0
         version: 0.2.2
@@ -136,8 +136,8 @@ packages:
       conventional-commits-parser:
         optional: true
 
-  '@rendobar/sdk@3.1.0':
-    resolution: {integrity: sha512-mmwiILyuoKeffHh6bwsofuxU5JdCBjtxH4vNN7fEgQzBij2WgLHcFPCMBz4Nltn41RYsNFaOAOmU/ZbLEqeyjQ==}
+  '@rendobar/sdk@3.3.0':
+    resolution: {integrity: sha512-UyHWGUppN7PsGVQi39btOGGcAFyZS4jdvFKxdVsI0PTlU0/4OQFlSrrpR3JPxlrGDVmI3GTlXl40p9VEnwD06g==}
     engines: {node: '>=18'}
 
   '@simple-libs/child-process-utils@1.0.2':
@@ -268,6 +268,7 @@ packages:
   git-raw-commits@5.0.1:
     resolution: {integrity: sha512-Y+csSm2GD/PCSh6Isd/WiMjNAydu0VBiG9J7EdQsNA5P9uXvLayqjmTsNlK5Gs9IhblFZqOU0yid5Il5JPoLiQ==}
     engines: {node: '>=18'}
+    deprecated: Deprecated and no longer maintained. Use @conventional-changelog/git-client instead.
     hasBin: true
 
   global-directory@5.0.0:
@@ -379,8 +380,8 @@ packages:
     resolution: {integrity: sha512-ayCKvm/phCGxOkYRSCM82iDwct8/EonSEgCSxWxD7ve6jHggsFl4fZVQBPRNgQoKiuV/odhFrGzQXZwbifC8Rg==}
     engines: {node: '>=8'}
 
-  partysocket@1.1.19:
-    resolution: {integrity: sha512-hPwsXSdUc8PKNCinET6TD3JQOxzQ2JaP0bUZQXBVl6UM8UuLn1odgf1LcJXHy4UHSQwWL/RU3AnyhEsGM+W+sg==}
+  partysocket@1.3.0:
+    resolution: {integrity: sha512-1zToNyolZFK/7nuAw/K2bZrNzFqaZyRoCEkS+9vG6WSC5ikrN6qWRe96q6ImU51uptz2r+dAwSkwhJVdQi4LiA==}
     peerDependencies:
       react: '>=17'
     peerDependenciesMeta:
@@ -584,9 +585,9 @@ snapshots:
     optionalDependencies:
       conventional-commits-parser: 6.4.0
 
-  '@rendobar/sdk@3.1.0':
+  '@rendobar/sdk@3.3.0':
     dependencies:
-      partysocket: 1.1.19
+      partysocket: 1.3.0
     transitivePeerDependencies:
       - react
 
@@ -798,7 +799,7 @@ snapshots:
       json-parse-even-better-errors: 2.3.1
       lines-and-columns: 1.2.4
 
-  partysocket@1.1.19:
+  partysocket@1.3.0:
     dependencies:
       event-target-polyfill: 0.0.4
 
