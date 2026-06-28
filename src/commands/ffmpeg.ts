@@ -8,7 +8,8 @@
 import { defineCommand } from "citty";
 import * as path from "node:path";
 import pc from "picocolors";
-import { createClient, isApiError } from "@rendobar/sdk";
+import { isApiError } from "@rendobar/sdk";
+import { createCliClient } from "../lib/client.js";
 import { resolveAuth, refreshTokenIfNeeded, getApiBaseUrl, getDashboardBaseUrl } from "../lib/auth.js";
 import { parseFfmpegArgs } from "../lib/parse-ffmpeg-args.js";
 import { shellEscape } from "../lib/shell-escape.js";
@@ -196,7 +197,7 @@ export default defineCommand({
     const clientConfig = cred.type === "apikey"
       ? { apiKey: cred.apiKey, baseUrl }
       : { accessToken: cred.accessToken, baseUrl };
-    const client = createClient(clientConfig);
+    const client = createCliClient(clientConfig);
     const steps = new StepRenderer({ isTTY, quiet: flags.quiet });
 
     const controller = new AbortController();
