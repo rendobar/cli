@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.0](https://github.com/rendobar/cli/compare/v1.6.0...v1.7.0) (2026-06-28)
+
+
+### Features
+
+* attribute CLI traffic as client=cli ([#74](https://github.com/rendobar/cli/issues/74)) ([f9058c3](https://github.com/rendobar/cli/commit/f9058c302d8ba03d3b42054e3d58c7bdd59c823d))
+
 ## [1.6.0](https://github.com/rendobar/cli/compare/v1.5.0...v1.6.0) (2026-06-22)
 
 
