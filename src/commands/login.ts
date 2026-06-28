@@ -6,7 +6,7 @@
  */
 import { defineCommand } from "citty";
 import pc from "picocolors";
-import { createClient } from "@rendobar/sdk";
+import { createCliClient } from "../lib/client.js";
 import { saveApiKey, saveOAuthCredentials, getConfigDir, openBrowser, CLI_CLIENT_ID, getApiBaseUrl } from "../lib/auth.js";
 const CALLBACK_PORT = 14832;
 const REDIRECT_URI = `http://127.0.0.1:${CALLBACK_PORT}/callback`;
@@ -130,7 +130,7 @@ export default defineCommand({
         process.exit(2);
       }
       try {
-        const client = createClient({ apiKey });
+        const client = createCliClient({ apiKey });
         const state = await client.orgs.current();
         await saveApiKey(apiKey, undefined, { orgName: state.org.name, plan: state.plan.name });
         process.stderr.write(`  ${pc.green("\u2713")} Verified | ${pc.bold(state.org.name)} | ${state.plan.name} plan\n`);
@@ -284,7 +284,7 @@ export default defineCommand({
 
     let identity: { orgName: string; plan: string } | undefined;
     try {
-      const client = createClient({ accessToken, baseUrl });
+      const client = createCliClient({ accessToken, baseUrl });
       const orgState = await client.orgs.current();
       identity = { orgName: orgState.org.name, plan: orgState.plan.name };
       process.stderr.write(`  ${pc.green("\u2713")} Signed in | ${pc.bold(orgState.org.name)} | ${orgState.plan.name} plan\n`);

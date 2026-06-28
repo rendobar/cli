@@ -3,7 +3,7 @@
  */
 import { defineCommand } from "citty";
 import pc from "picocolors";
-import { createClient } from "@rendobar/sdk";
+import { createCliClient } from "../lib/client.js";
 import { resolveAuth, refreshTokenIfNeeded, getApiBaseUrl, saveApiKey, saveOAuthCredentials } from "../lib/auth.js";
 
 export default defineCommand({
@@ -31,7 +31,7 @@ export default defineCommand({
       : { accessToken: cred.accessToken, baseUrl };
 
     try {
-      const client = createClient(clientConfig);
+      const client = createCliClient(clientConfig);
       const state = await client.orgs.current();
 
       process.stderr.write(`  ${pc.dim("Org")}       ${pc.bold(state.org.name)}\n`);
