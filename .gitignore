@@ -26,3 +26,5 @@ src/generated/
 *.swp
 .DS_Store
 Thumbs.db
+
+.claude/
