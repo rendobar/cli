@@ -7,7 +7,7 @@
 <h1 align="center">Rendobar CLI</h1>
 <p align="center">
   <strong>Serverless video processing from your terminal.</strong><br>
-  Watermark, transcode, caption, render videos with one command.
+  Run FFmpeg jobs and burn captions in the cloud with one command.
 </p>
 <p align="center">
   <a href="https://rendobar.com">Website</a> •
@@ -101,7 +101,7 @@ Self-replaces the binary in-place with checksum verification and automatic rollb
 
 ## What is Rendobar?
 
-Rendobar is a serverless media processing platform — watermark, transcode, caption, render videos with one API call. Credit-based billing. MCP-native for AI agents.
+Rendobar is a serverless media processing platform. Run FFmpeg jobs and burn captions with one API call. Credit-based billing. MCP-native for AI agents.
 
 - **Website**: https://rendobar.com
 - **Docs**: https://rendobar.com/docs/
