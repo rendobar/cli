@@ -11,12 +11,13 @@ export interface CommandEntry {
 }
 
 export const COMMANDS: readonly CommandEntry[] = [
-  { name: "ffmpeg", summary: "Run ffmpeg in the cloud",            group: "CORE",    load: () => import("./commands/ffmpeg.js") },
-  { name: "login",  summary: "Authenticate this machine",          group: "ACCOUNT", load: () => import("./commands/login.js") },
-  { name: "logout", summary: "Remove stored credentials",          group: "ACCOUNT", load: () => import("./commands/logout.js") },
-  { name: "whoami", summary: "Show identity, plan, and balance",   group: "ACCOUNT", load: () => import("./commands/whoami.js") },
-  { name: "update", summary: "Self-update to the latest version",  group: "SYSTEM",  load: () => import("./commands/update.js") },
-  { name: "doctor", summary: "Diagnose environment + auth",        group: "SYSTEM",  load: () => import("./commands/doctor.js") },
+  { name: "ffmpeg",  summary: "Run ffmpeg in the cloud",           group: "CORE",    load: () => import("./commands/ffmpeg.js") },
+  { name: "ffprobe", summary: "Probe media metadata",              group: "CORE",    load: () => import("./commands/ffprobe.js") },
+  { name: "login",   summary: "Authenticate this machine",         group: "ACCOUNT", load: () => import("./commands/login.js") },
+  { name: "logout",  summary: "Remove stored credentials",         group: "ACCOUNT", load: () => import("./commands/logout.js") },
+  { name: "whoami",  summary: "Show identity, plan, and balance",  group: "ACCOUNT", load: () => import("./commands/whoami.js") },
+  { name: "update",  summary: "Self-update to the latest version", group: "SYSTEM",  load: () => import("./commands/update.js") },
+  { name: "doctor",  summary: "Diagnose environment + auth",       group: "SYSTEM",  load: () => import("./commands/doctor.js") },
 ];
 
 export const GROUP_ORDER: readonly Group[] = ["CORE", "ACCOUNT", "SYSTEM"];
