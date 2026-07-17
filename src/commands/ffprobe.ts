@@ -10,7 +10,7 @@
  */
 import { defineCommand } from "citty";
 import pc from "picocolors";
-import { isApiError, WaitTimeoutError } from "@rendobar/sdk";
+import { isApiError, jobData, WaitTimeoutError } from "@rendobar/sdk";
 import { createCliClient } from "../lib/client.js";
 import { resolveAuth, refreshTokenIfNeeded, getApiBaseUrl, getDashboardBaseUrl } from "../lib/auth.js";
 import { uploadLocalFiles } from "../lib/upload.js";
@@ -49,9 +49,23 @@ export function resolveTimeout(raw: string | undefined): number {
   return Math.min(val, MAX_TIMEOUT_SEC);
 }
 
-/** Job submission params: `keyframes` is only included when requested. */
-export function buildProbeParams(keyframes: boolean): Record<string, unknown> {
-  return { ...(keyframes ? { keyframes: true } : {}) };
+/**
+ * Job submission params: `timeout` always bounds server-side probe execution
+ * (mirrors `rb ffmpeg`'s `params.timeout`); `keyframes` is only included when
+ * requested.
+ */
+export function buildProbeParams(keyframes: boolean, timeoutSec: number): Record<string, unknown> {
+  return { timeout: timeoutSec, ...(keyframes ? { keyframes: true } : {}) };
+}
+
+/**
+ * Client-side poll budget for `jobs.wait()`. Must OUTLAST the server-side
+ * `timeout` so the CLI observes the job's terminal state (completion, or the
+ * server's own timeout failure) instead of giving up first. Server bound plus
+ * a fixed margin, floored at the SDK's own default wait budget.
+ */
+export function resolveWaitBudgetMs(timeoutSec: number): number {
+  return Math.max((timeoutSec + 60) * 1000, 300_000);
 }
 
 /** `--raw` prints everything; the default prints just the normalized summary. */
@@ -77,7 +91,7 @@ ${pc.bold("Flags:")}
   --json         Output the full job result as JSON
   --quiet        No progress output, exit code only
   --no-wait      Submit and exit immediately (prints job ID)
-  --timeout N    Max wait time in seconds (default: ${DEFAULT_TIMEOUT_SEC}, max: ${MAX_TIMEOUT_SEC})
+  --timeout N    Max probe execution time in seconds (default: ${DEFAULT_TIMEOUT_SEC}, max: ${MAX_TIMEOUT_SEC})
 
 ${pc.dim("Prints result.output.data.summary as JSON to stdout, pipeable to jq.")}
 ${pc.dim("Local files are auto-uploaded before job submission.")}
@@ -95,7 +109,7 @@ export default defineCommand({
     json: { type: "boolean", description: "Output the full job result as JSON", default: false },
     quiet: { type: "boolean", description: "No progress output, exit code only", default: false },
     "no-wait": { type: "boolean", description: "Submit and exit immediately", default: false },
-    timeout: { type: "string", description: `Max wait time in seconds (default: ${DEFAULT_TIMEOUT_SEC}, max: ${MAX_TIMEOUT_SEC})` },
+    timeout: { type: "string", description: `Max probe execution time in seconds (default: ${DEFAULT_TIMEOUT_SEC}, max: ${MAX_TIMEOUT_SEC})` },
   },
   async run({ args }) {
     const sourceArg = typeof args.source === "string" ? args.source.trim() : "";
@@ -165,7 +179,7 @@ export default defineCommand({
       // ── 2. Submit ────────────────────────────────────────
       const job = await steps.step("Submitting", async () => {
         return client.jobs.create(
-          { type: "ffprobe", inputs: { source }, params: buildProbeParams(flags.keyframes) },
+          { type: "ffprobe", inputs: { source }, params: buildProbeParams(flags.keyframes, flags.timeout) },
           { signal: controller.signal },
         );
       });
@@ -179,8 +193,10 @@ export default defineCommand({
       }
 
       // ── 3. Wait for the probe to finish ──────────────────
+      // The wait budget must outlast the server-side `params.timeout` so we
+      // observe the job's terminal state rather than giving up first.
       const result = await steps.step("Probing", async () => {
-        return client.jobs.wait(job.id, { timeout: flags.timeout * 1000, signal: controller.signal });
+        return client.jobs.wait(job.id, { timeout: resolveWaitBudgetMs(flags.timeout), signal: controller.signal });
       });
 
       const dashboardLine = `    ${pc.dim(`${getDashboardBaseUrl()}/jobs/${job.id}`)}\n`;
@@ -211,9 +227,13 @@ export default defineCommand({
       if (flags.json) { console.log(JSON.stringify(result)); process.exit(0); }
 
       // API contract: ffprobe's output.data always has this shape (see header
-      // comment). The SDK types `data` as `unknown` because jobs.create/wait are
-      // generic over job type -- this is the command's one deliberate assertion.
-      const data = result.output.data as ProbeData;
+      // comment). `jobData<T>()` does the status check plus the SDK's own
+      // justified cast -- this is the command's one claim about ffprobe's shape.
+      const data = jobData<ProbeData>(result);
+      if (!data) {
+        if (!flags.quiet) process.stderr.write(pc.red("  ✗ Probe completed with no data\n"));
+        process.exit(1);
+      }
       const payload = selectPayload(data, flags.raw);
 
       // Structured answer goes to stdout so it can be piped (e.g. to jq).

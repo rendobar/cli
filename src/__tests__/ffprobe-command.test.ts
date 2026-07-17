@@ -2,7 +2,13 @@ import { describe, it, expect, mock, beforeEach, afterEach } from "bun:test";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import ffprobeCommand, { isLocalSource, resolveTimeout, buildProbeParams, selectPayload } from "../commands/ffprobe.js";
+import ffprobeCommand, {
+  isLocalSource,
+  resolveTimeout,
+  resolveWaitBudgetMs,
+  buildProbeParams,
+  selectPayload,
+} from "../commands/ffprobe.js";
 import { uploadLocalFiles } from "../lib/upload.js";
 
 describe("ffprobe command metadata", () => {
@@ -59,13 +65,34 @@ describe("resolveTimeout", () => {
 
 describe("buildProbeParams", () => {
   it("omits keyframes when not requested", () => {
-    const params = buildProbeParams(false);
+    const params = buildProbeParams(false, 60);
     expect("keyframes" in params).toBe(false);
   });
 
   it("includes keyframes: true when requested", () => {
-    const params = buildProbeParams(true);
+    const params = buildProbeParams(true, 60);
     expect(params.keyframes).toBe(true);
+  });
+
+  it("always forwards timeout so it bounds server-side probe execution", () => {
+    expect(buildProbeParams(false, 60).timeout).toBe(60);
+    expect(buildProbeParams(true, 900).timeout).toBe(900);
+  });
+});
+
+describe("resolveWaitBudgetMs", () => {
+  it("outlasts the server-side timeout by a margin", () => {
+    expect(resolveWaitBudgetMs(900)).toBe((900 + 60) * 1000);
+  });
+
+  it("floors at the SDK's own default wait budget (300s) for small timeouts", () => {
+    expect(resolveWaitBudgetMs(60)).toBe(300_000);
+  });
+
+  it("never equals the raw server timeout in milliseconds", () => {
+    for (const t of [30, 60, 300, 900]) {
+      expect(resolveWaitBudgetMs(t)).not.toBe(t * 1000);
+    }
   });
 });
 
