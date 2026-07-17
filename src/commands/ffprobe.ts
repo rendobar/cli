@@ -2,7 +2,7 @@
  * `rb ffprobe` -- Probe media metadata in the cloud.
  *
  * Data-only job: submit a URL (or local file, auto-uploaded first) and get back
- * `output.data = { summary, format, streams, chapters, keyframes?, probe }`.
+ * `output.data = { summary, format, streams, chapters, probe }`.
  * `client.jobs.wait()` already resolves on the job's terminal state, so this
  * command skips the WebSocket/machine-context dance `rb ffmpeg` uses for
  * longer-running renders -- a probe is fast, and the SDK's own discriminated
@@ -30,7 +30,6 @@ interface ProbeData {
   format?: unknown;
   streams?: unknown;
   chapters?: unknown;
-  keyframes?: unknown;
   probe?: unknown;
 }
 
@@ -51,11 +50,10 @@ export function resolveTimeout(raw: string | undefined): number {
 
 /**
  * Job submission params: `timeout` always bounds server-side probe execution
- * (mirrors `rb ffmpeg`'s `params.timeout`); `keyframes` is only included when
- * requested.
+ * (mirrors `rb ffmpeg`'s `params.timeout`).
  */
-export function buildProbeParams(keyframes: boolean, timeoutSec: number): Record<string, unknown> {
-  return { timeout: timeoutSec, ...(keyframes ? { keyframes: true } : {}) };
+export function buildProbeParams(timeoutSec: number): Record<string, unknown> {
+  return { timeout: timeoutSec };
 }
 
 /**
@@ -83,10 +81,9 @@ ${pc.bold("Examples:")}
   rb ffprobe https://example.com/video.mp4
   rb ffprobe ./local-video.mp4
   rb ffprobe --raw https://cdn.rendobar.com/uploads/abc.mp4
-  rb ffprobe --keyframes video.mp4 | jq '.video.fps'
+  rb ffprobe video.mp4 | jq '.video.fps'
 
 ${pc.bold("Flags:")}
-  --keyframes    Include a keyframe index in the probe
   --raw          Print the full probe data (format, streams, chapters), not just the summary
   --json         Output the full job result as JSON
   --quiet        No progress output, exit code only
@@ -104,7 +101,6 @@ export default defineCommand({
   meta: { name: "ffprobe", description: "Probe media metadata in the cloud" },
   args: {
     source: { type: "positional", description: "Media URL, asset URL, or local file path", required: false },
-    keyframes: { type: "boolean", description: "Include a keyframe index in the probe", default: false },
     raw: { type: "boolean", description: "Print the full probe data, not just the summary", default: false },
     json: { type: "boolean", description: "Output the full job result as JSON", default: false },
     quiet: { type: "boolean", description: "No progress output, exit code only", default: false },
@@ -117,7 +113,6 @@ export default defineCommand({
 
     const isTTY = Boolean(process.stderr.isTTY);
     const flags = {
-      keyframes: Boolean(args.keyframes),
       raw: Boolean(args.raw),
       json: Boolean(args.json),
       quiet: Boolean(args.quiet),
@@ -179,7 +174,7 @@ export default defineCommand({
       // ── 2. Submit ────────────────────────────────────────
       const job = await steps.step("Submitting", async () => {
         return client.jobs.create(
-          { type: "ffprobe", inputs: { source }, params: buildProbeParams(flags.keyframes, flags.timeout) },
+          { type: "ffprobe", inputs: { source }, params: buildProbeParams(flags.timeout) },
           { signal: controller.signal },
         );
       });

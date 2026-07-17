@@ -19,7 +19,7 @@ describe("ffprobe command metadata", () => {
   it("declares the documented flags", () => {
     const args = ffprobeCommand.args as Record<string, unknown>;
     expect(Object.keys(args).sort()).toEqual(
-      ["json", "keyframes", "no-wait", "quiet", "raw", "source", "timeout"].sort(),
+      ["json", "no-wait", "quiet", "raw", "source", "timeout"].sort(),
     );
   });
 });
@@ -64,19 +64,9 @@ describe("resolveTimeout", () => {
 });
 
 describe("buildProbeParams", () => {
-  it("omits keyframes when not requested", () => {
-    const params = buildProbeParams(false, 60);
-    expect("keyframes" in params).toBe(false);
-  });
-
-  it("includes keyframes: true when requested", () => {
-    const params = buildProbeParams(true, 60);
-    expect(params.keyframes).toBe(true);
-  });
-
   it("always forwards timeout so it bounds server-side probe execution", () => {
-    expect(buildProbeParams(false, 60).timeout).toBe(60);
-    expect(buildProbeParams(true, 900).timeout).toBe(900);
+    expect(buildProbeParams(60).timeout).toBe(60);
+    expect(buildProbeParams(900).timeout).toBe(900);
   });
 });
 
