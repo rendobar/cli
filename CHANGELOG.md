@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.0](https://github.com/rendobar/cli/compare/v1.7.0...v1.8.0) (2026-07-19)
+
+
+### Features
+
+* add rb ffprobe command ([#107](https://github.com/rendobar/cli/issues/107)) ([57461b2](https://github.com/rendobar/cli/commit/57461b20fff9e1f6196f88b7c98d67fa4c7d913d))
+
 ## [1.7.0](https://github.com/rendobar/cli/compare/v1.6.0...v1.7.0) (2026-06-28)
 
 
