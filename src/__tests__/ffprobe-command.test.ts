@@ -10,8 +10,10 @@ import ffprobeCommand, {
   extractGlobalFlags,
   extractProbeArgs,
   findProbeInput,
-  formatSummary,
+  formatSummaryBlock,
+  resolveOutputText,
   type ProbeSummary,
+  type ProbeData,
 } from "../commands/ffprobe.js";
 import { uploadLocalFiles } from "../lib/upload.js";
 
@@ -232,48 +234,129 @@ describe("buildProbeParams", () => {
   });
 });
 
-describe("formatSummary", () => {
-  it("formats a video summary with resolution and fps", () => {
+describe("formatSummaryBlock", () => {
+  it("renders a video summary with codec, resolution, and fps in the Video row", () => {
     const summary: ProbeSummary = {
       kind: "video",
-      container: "mp4",
-      durationSec: 75,
-      video: { codec: "h264", width: 1920, height: 1080, fps: 30 },
+      container: "mov,mp4,m4a,3gp,3g2,mj2",
+      durationSec: 5.01,
+      sizeBytes: 352_256, // 344 KB
+      video: {
+        codec: "h264",
+        profile: "High",
+        width: 1280,
+        height: 720,
+        fps: 24,
+        bitDepth: 8,
+        pixelFormat: "yuv420p",
+        bitrateBps: 449_000,
+      },
     };
-    expect(formatSummary(summary)).toBe("Video  mp4  1:15  1920x1080  30fps");
+    const block = formatSummaryBlock(summary);
+    expect(block).toContain("Video");
+    expect(block).toContain("mov,mp4,m4a,3gp,3g2,mj2");
+    expect(block).toContain("5.01s");
+    expect(block).toContain("344 KB");
+    expect(block).toContain("h264 High");
+    expect(block).toContain("1280x720");
+    expect(block).toContain("24 fps");
+    expect(block).toContain("8-bit yuv420p");
+    expect(block).toContain("449 kbps");
   });
 
-  it("formats an audio summary with codec and channels", () => {
+  it("renders an audio-only summary with the Audio row and no Video row", () => {
     const summary: ProbeSummary = {
       kind: "audio",
       container: "mp3",
       durationSec: 200,
-      audio: { codec: "mp3", channels: 2 },
+      audio: { codec: "mp3", profile: "LC", channelLayout: "stereo", sampleRate: 48_000, bitrateBps: 96_000 },
     };
-    expect(formatSummary(summary)).toBe("Audio  mp3  3:20  mp3  2ch");
+    const block = formatSummaryBlock(summary);
+    expect(block).toContain("Audio");
+    expect(block).toContain("mp3 LC");
+    expect(block).toContain("stereo");
+    expect(block).toContain("48 kHz");
+    expect(block).toContain("96 kbps");
+    expect(block).not.toContain("Video");
   });
 
-  it("formats an image summary with dimensions", () => {
+  it("falls back to a raw channel count when channelLayout is absent", () => {
+    const summary: ProbeSummary = { kind: "audio", audio: { codec: "aac", channels: 6 } };
+    expect(formatSummaryBlock(summary)).toContain("6ch");
+  });
+
+  it("renders an image summary with dimensions and pixel format", () => {
     const summary: ProbeSummary = {
       kind: "image",
       container: "png",
-      image: { codec: "png", width: 512, height: 512 },
+      sizeBytes: 46_080,
+      image: { width: 512, height: 512, pixelFormat: "rgba", bitDepth: 8 },
     };
-    expect(formatSummary(summary)).toBe("Image  png  512x512");
+    const block = formatSummaryBlock(summary);
+    expect(block).toContain("Image");
+    expect(block).toContain("512x512");
+    expect(block).toContain("8-bit rgba");
   });
 
-  it("degrades gracefully for the other kind and missing fields", () => {
+  it("renders stream counts for the other kind, skipping zero counts", () => {
+    const summary: ProbeSummary = {
+      kind: "other",
+      container: "matroska",
+      streamCounts: { video: 1, audio: 2, subtitle: 1, data: 0 },
+    };
+    const block = formatSummaryBlock(summary);
+    expect(block).toContain("1 video");
+    expect(block).toContain("2 audio");
+    expect(block).toContain("1 subtitle");
+    expect(block).not.toContain("0 data");
+  });
+
+  it("degrades gracefully to just the header line when fields are missing", () => {
     const summary: ProbeSummary = { kind: "other" };
-    expect(formatSummary(summary)).toBe("Other  unknown");
+    const block = formatSummaryBlock(summary);
+    expect(block).toContain("Other");
+    expect(block).not.toContain("\n");
   });
 
-  it("formats an hour-plus duration as h:mm:ss", () => {
+  it("flags HDR and rotation on the video row when present", () => {
     const summary: ProbeSummary = {
       kind: "video",
-      container: "mkv",
-      durationSec: 3661,
-      video: {},
+      container: "mp4",
+      video: { codec: "hevc", width: 3840, height: 2160, displayAspectRatio: "16:9", isHdr: true, rotation: 90 },
     };
-    expect(formatSummary(summary)).toBe("Video  mkv  1:01:01");
+    const block = formatSummaryBlock(summary);
+    expect(block).toContain("3840x2160 (16:9)");
+    expect(block).toContain("HDR");
+    expect(block).toContain("rotated 90°");
+  });
+
+  it("formats a sub-minute duration with fractional seconds, and minute-plus as m:ss", () => {
+    expect(formatSummaryBlock({ kind: "other", durationSec: 5.01 })).toContain("5.01s");
+    expect(formatSummaryBlock({ kind: "other", durationSec: 75 })).toContain("1:15");
+    expect(formatSummaryBlock({ kind: "other", durationSec: 3661 })).toContain("1:01:01");
+  });
+});
+
+describe("resolveOutputText", () => {
+  it("renders the summary block when `summary` is present", () => {
+    const data: ProbeData = {
+      summary: { kind: "audio", container: "mp3", audio: { codec: "mp3" } },
+    };
+    expect(resolveOutputText(data)).toContain("Audio");
+  });
+
+  it("prints raw stdout verbatim and skips the summary block when `summary` is absent", () => {
+    // What a `-print_format csv` / `-of default` invocation returns: no
+    // parsed summary, just ffprobe's own text.
+    const raw = 'format_name=mov,mp4,m4a,3gp,3g2,mj2\nstreams.stream.0.codec_name="h264"\n';
+    const data: ProbeData = { stdout: raw };
+    const text = resolveOutputText(data);
+    expect(text).toBe(raw);
+    expect(text).not.toContain("Video");
+    expect(text).not.toContain("kbps");
+  });
+
+  it("returns null when the response carries neither summary nor stdout", () => {
+    expect(resolveOutputText({})).toBeNull();
   });
 });
