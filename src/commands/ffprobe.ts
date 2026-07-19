@@ -1,11 +1,13 @@
 /**
  * `rb ffprobe` -- Run a raw ffprobe command against a media URL, in the cloud.
  *
- * Raw-command redesign: argv (ffprobe flags plus the media URL) is joined
+ * Raw-command redesign: argv (ffprobe flags plus the media target) is joined
  * verbatim into `params.command`, exactly like `rb ffmpeg` does for its own
- * command string. There is no separate `inputs.source` -- the URL lives
- * inside `command`, and there is no local-file upload step; ffprobe targets
- * a media URL only.
+ * command string. There is no separate `inputs.source` -- the target lives
+ * inside `command`. The job itself stays URL-only (the API requires an
+ * `http(s)://` URL in `command`); a local file path typed on the CLI is
+ * auto-uploaded first and the command is rewritten with the resulting URL,
+ * exactly like `rb ffmpeg` does with its `-i` inputs -- see "Upload" below.
  *
  * Data-only job: `client.jobs.wait()` already resolves on the job's terminal
  * state, so this command skips the WebSocket/machine-context dance
@@ -19,7 +21,9 @@ import { isApiError, jobData, WaitTimeoutError } from "@rendobar/sdk";
 import { createCliClient } from "../lib/client.js";
 import { resolveAuth, refreshTokenIfNeeded, getApiBaseUrl, getDashboardBaseUrl } from "../lib/auth.js";
 import { shellEscape } from "../lib/shell-escape.js";
-import { StepRenderer } from "../lib/progress.js";
+import { isLocalPath, type ParsedInput } from "../lib/parse-ffmpeg-args.js";
+import { uploadLocalFiles } from "../lib/upload.js";
+import { StepRenderer, fmtBytes } from "../lib/progress.js";
 
 const DEFAULT_TIMEOUT_SEC = 60;
 const MAX_TIMEOUT_SEC = 900;
@@ -111,6 +115,25 @@ export function buildCommand(args: string[]): string {
   return "ffprobe " + args.map(shellEscape).join(" ");
 }
 
+/**
+ * Finds the media target among the raw ffprobe args -- the URL or local file
+ * path the user is probing. Unlike `rb ffmpeg`, ffprobe args don't require an
+ * explicit `-i` flag (`rb ffprobe video.mp4` is the documented minimal form),
+ * so the target is the last token that isn't itself a flag. This still finds
+ * an explicit `-i <path>` too, since its value is that same trailing token.
+ * Reuses `isLocalPath` -- the exact local-vs-remote check `rb ffmpeg` uses via
+ * `parseFfmpegArgs` -- rather than inventing a second rule for what "local"
+ * means.
+ */
+export function findProbeInput(args: string[]): ParsedInput | null {
+  for (let i = args.length - 1; i >= 0; i--) {
+    const arg = args[i]!;
+    if (arg.startsWith("-")) continue;
+    return { index: i, value: arg, isLocal: isLocalPath(arg) };
+  }
+  return null;
+}
+
 /** Job submission params: `command` carries the URL + flags, `timeout` bounds server-side execution. */
 export function buildProbeParams(command: string, timeoutSec: number): Record<string, unknown> {
   return { command, timeout: timeoutSec };
@@ -193,10 +216,11 @@ export function formatSummary(summary: ProbeSummary): string {
 
 function showHelp(): void {
   process.stderr.write(`
-${pc.bold("Usage:")} rb ffprobe [ffprobe-flags] <url>
+${pc.bold("Usage:")} rb ffprobe [ffprobe-flags] <url-or-file>
 
 ${pc.bold("Examples:")}
   rb ffprobe https://example.com/video.mp4
+  rb ffprobe ./local-video.mp4
   rb ffprobe -show_format -show_streams https://example.com/video.mp4
   rb ffprobe --json https://cdn.rendobar.com/uploads/abc.mp4
 
@@ -206,7 +230,8 @@ ${pc.bold("Flags:")}
   --no-wait      Submit and exit immediately (prints job ID)
   --timeout N    Max probe execution time in seconds (default: ${DEFAULT_TIMEOUT_SEC}, max: ${MAX_TIMEOUT_SEC})
 
-${pc.dim("Run a raw ffprobe command against a media URL.")}
+${pc.dim("Run a raw ffprobe command against a media URL or local file.")}
+${pc.dim("Local files are auto-uploaded before job submission.")}
 ${pc.dim("All ffprobe flags are passed through to the cloud runner.")}
 `);
 }
@@ -247,8 +272,6 @@ export default defineCommand({
     const client = createCliClient(clientConfig);
     const steps = new StepRenderer({ isTTY, quiet: flags.quiet });
 
-    const command = buildCommand(probeArgs);
-
     const controller = new AbortController();
     let jobId: string | undefined;
 
@@ -263,7 +286,22 @@ export default defineCommand({
     });
 
     try {
-      // ── 1. Submit ────────────────────────────────────────
+      // ── 1. Upload (local target only) ────────────────────
+      let rewrittenArgs = probeArgs;
+      const target = findProbeInput(probeArgs);
+
+      if (target?.isLocal) {
+        rewrittenArgs = await steps.step("Uploading", async (update) => {
+          return uploadLocalFiles(probeArgs, [target], client, {
+            onFileStart: (filename, size) => update(`${filename} · ${fmtBytes(size)}`),
+            onFileProgress: (filename, loaded, size) => update(`${filename} · ${fmtBytes(loaded)} / ${fmtBytes(size)}`),
+          });
+        });
+      }
+
+      const command = buildCommand(rewrittenArgs);
+
+      // ── 2. Submit ────────────────────────────────────────
       const job = await steps.step("Submitting", async () => {
         return client.jobs.create(
           { type: "ffprobe", params: buildProbeParams(command, flags.timeout) },
@@ -279,7 +317,7 @@ export default defineCommand({
         process.exit(0);
       }
 
-      // ── 2. Wait for the probe to finish ──────────────────
+      // ── 3. Wait for the probe to finish ──────────────────
       // The wait budget must outlast the server-side `params.timeout` so we
       // observe the job's terminal state rather than giving up first.
       const result = await steps.step("Probing", async () => {

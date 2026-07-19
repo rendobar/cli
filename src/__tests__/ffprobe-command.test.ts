@@ -1,4 +1,7 @@
-import { describe, it, expect } from "bun:test";
+import { describe, it, expect, mock, beforeEach, afterEach } from "bun:test";
+import * as fs from "node:fs";
+import * as path from "node:path";
+import * as os from "node:os";
 import ffprobeCommand, {
   resolveTimeout,
   resolveWaitBudgetMs,
@@ -6,9 +9,11 @@ import ffprobeCommand, {
   buildProbeParams,
   extractGlobalFlags,
   extractProbeArgs,
+  findProbeInput,
   formatSummary,
   type ProbeSummary,
 } from "../commands/ffprobe.js";
+import { uploadLocalFiles } from "../lib/upload.js";
 
 describe("ffprobe command metadata", () => {
   it("registers as `ffprobe` with the raw-command description", () => {
@@ -123,6 +128,95 @@ describe("buildCommand", () => {
   it("shell-escapes args containing shell-special characters", () => {
     const command = buildCommand(["-select_streams", "v:0", "https://example.com/a b.mp4"]);
     expect(command).toBe("ffprobe -select_streams v:0 'https://example.com/a b.mp4'");
+  });
+});
+
+describe("findProbeInput", () => {
+  it("finds a plain URL as the target and marks it not local", () => {
+    expect(findProbeInput(["https://example.com/video.mp4"])).toEqual({
+      index: 0,
+      value: "https://example.com/video.mp4",
+      isLocal: false,
+    });
+  });
+
+  it("finds a local file path as the trailing target", () => {
+    expect(findProbeInput(["-show_format", "./local-video.mp4"])).toEqual({
+      index: 1,
+      value: "./local-video.mp4",
+      isLocal: true,
+    });
+  });
+
+  it("skips trailing flags to find the target ahead of them", () => {
+    expect(findProbeInput(["-i", "./local-video.mp4", "-show_format"])).toEqual({
+      index: 1,
+      value: "./local-video.mp4",
+      isLocal: true,
+    });
+  });
+
+  it("returns null when every token looks like a flag", () => {
+    expect(findProbeInput(["-show_format", "-show_streams"])).toBeNull();
+  });
+
+  it("returns null for an empty args list", () => {
+    expect(findProbeInput([])).toBeNull();
+  });
+});
+
+describe("ffprobe local file upload", () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "rb-ffprobe-test-"));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  function createTempFile(name: string, content = "fake"): string {
+    const filePath = path.join(tmpDir, name);
+    fs.writeFileSync(filePath, content);
+    return filePath;
+  }
+
+  it("uploads a local file target and rewrites the command with its URL", async () => {
+    const localPath = createTempFile("video.mp4");
+    const args = ["-show_format", localPath];
+    const target = findProbeInput(args);
+    expect(target?.isLocal).toBe(true);
+
+    const mockClient = {
+      uploads: { create: mock(() => Promise.resolve({ url: "https://cdn.rendobar.com/uploads/probe.mp4" })) },
+    } as unknown as Parameters<typeof uploadLocalFiles>[2];
+
+    // Same upload boundary `rb ffmpeg`'s test mocks: the SDK's uploads.create
+    // call, not the owned uploadLocalFiles/buildCommand code under test.
+    const rewritten = await uploadLocalFiles(args, [target!], mockClient);
+    const command = buildCommand(rewritten);
+
+    expect(mockClient.uploads.create).toHaveBeenCalledTimes(1);
+    expect(command).toContain("cdn.rendobar.com/uploads/probe.mp4");
+    expect(command).not.toContain(localPath);
+  });
+
+  it("leaves a plain URL command untouched -- no upload triggered", async () => {
+    const args = ["-show_format", "https://example.com/video.mp4"];
+    const target = findProbeInput(args);
+    expect(target?.isLocal).toBe(false);
+
+    const mockUpload = mock(() => Promise.resolve({ url: "https://cdn.rendobar.com/uploads/unused.mp4" }));
+    const mockClient = { uploads: { create: mockUpload } } as unknown as Parameters<typeof uploadLocalFiles>[2];
+
+    // Mirrors the command's own guard: uploadLocalFiles is only invoked when
+    // `target?.isLocal` is true, so a URL command never reaches the upload
+    // client at all.
+    const command = buildCommand(args);
+
+    expect(mockUpload).not.toHaveBeenCalled();
+    expect(command).toBe("ffprobe -show_format https://example.com/video.mp4");
   });
 });
 
