@@ -21,6 +21,16 @@ export interface ParsedInput {
   isLocal: boolean;
 }
 
+/**
+ * A bare `http(s)://` value is remote; anything else is a local file path.
+ * Single source of truth for the local-vs-remote check -- `rb ffmpeg` and
+ * `rb ffprobe` both upload local inputs before submission and must agree on
+ * what counts as "local".
+ */
+export function isLocalPath(value: string): boolean {
+  return !value.startsWith("http://") && !value.startsWith("https://");
+}
+
 export interface ParseResult {
   inputs: ParsedInput[];
   outputFile: string | null;
@@ -51,8 +61,7 @@ export function parseFfmpegArgs(args: string[]): ParseResult {
         continue;
       }
 
-      const isLocal = !value.startsWith("http://") && !value.startsWith("https://");
-      inputs.push({ index: i + 1, value, isLocal });
+      inputs.push({ index: i + 1, value, isLocal: isLocalPath(value) });
       i++;
       continue;
     }
