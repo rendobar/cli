@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.0](https://github.com/rendobar/cli/compare/v1.8.0...v1.9.0) (2026-07-19)
+
+
+### Features
+
+* readable rb ffprobe metadata output ([#110](https://github.com/rendobar/cli/issues/110)) ([40e147d](https://github.com/rendobar/cli/commit/40e147dc8574ca995b35eb538658e6147c3b1ac9))
+
 ## [1.8.0](https://github.com/rendobar/cli/compare/v1.7.0...v1.8.0) (2026-07-19)
 
 
