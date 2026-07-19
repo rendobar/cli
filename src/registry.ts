@@ -12,7 +12,7 @@ export interface CommandEntry {
 
 export const COMMANDS: readonly CommandEntry[] = [
   { name: "ffmpeg",  summary: "Run ffmpeg in the cloud",           group: "CORE",    load: () => import("./commands/ffmpeg.js") },
-  { name: "ffprobe", summary: "Probe media metadata",              group: "CORE",    load: () => import("./commands/ffprobe.js") },
+  { name: "ffprobe", summary: "Run a raw ffprobe command",          group: "CORE",    load: () => import("./commands/ffprobe.js") },
   { name: "login",   summary: "Authenticate this machine",         group: "ACCOUNT", load: () => import("./commands/login.js") },
   { name: "logout",  summary: "Remove stored credentials",         group: "ACCOUNT", load: () => import("./commands/logout.js") },
   { name: "whoami",  summary: "Show identity, plan, and balance",  group: "ACCOUNT", load: () => import("./commands/whoami.js") },

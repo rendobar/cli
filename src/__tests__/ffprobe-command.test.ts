@@ -1,45 +1,75 @@
-import { describe, it, expect, mock, beforeEach, afterEach } from "bun:test";
-import * as fs from "node:fs";
-import * as path from "node:path";
-import * as os from "node:os";
+import { describe, it, expect } from "bun:test";
 import ffprobeCommand, {
-  isLocalSource,
   resolveTimeout,
   resolveWaitBudgetMs,
+  buildCommand,
   buildProbeParams,
-  selectPayload,
+  extractGlobalFlags,
+  extractProbeArgs,
+  formatSummary,
+  type ProbeSummary,
 } from "../commands/ffprobe.js";
-import { uploadLocalFiles } from "../lib/upload.js";
 
 describe("ffprobe command metadata", () => {
-  it("registers as `ffprobe` with a description", () => {
-    expect(ffprobeCommand.meta).toMatchObject({ name: "ffprobe", description: "Probe media metadata in the cloud" });
-  });
-
-  it("declares the documented flags", () => {
-    const args = ffprobeCommand.args as Record<string, unknown>;
-    expect(Object.keys(args).sort()).toEqual(
-      ["json", "no-wait", "quiet", "raw", "source", "timeout"].sort(),
-    );
+  it("registers as `ffprobe` with the raw-command description", () => {
+    expect(ffprobeCommand.meta).toMatchObject({
+      name: "ffprobe",
+      description: "Run a raw ffprobe command against a media URL",
+    });
   });
 });
 
-describe("isLocalSource", () => {
-  it("treats http/https URLs as remote", () => {
-    expect(isLocalSource("http://example.com/video.mp4")).toBe(false);
-    expect(isLocalSource("https://example.com/video.mp4")).toBe(false);
-    expect(isLocalSource("https://cdn.rendobar.com/uploads/abc.mp4")).toBe(false);
+describe("extractProbeArgs", () => {
+  it("joins ffprobe flags and the URL from argv, in order", () => {
+    const argv = ["bun", "rb", "ffprobe", "-show_format", "-show_streams", "https://example.com/video.mp4"];
+    expect(extractProbeArgs(argv)).toEqual(["-show_format", "-show_streams", "https://example.com/video.mp4"]);
   });
 
-  it("treats anything else as a local file path", () => {
-    expect(isLocalSource("./local.mp4")).toBe(true);
-    expect(isLocalSource("video.mp4")).toBe(true);
-    expect(isLocalSource("/abs/path/video.mp4")).toBe(true);
-    expect(isLocalSource("C:\\Users\\me\\video.mp4")).toBe(true);
+  it("supports a minimal invocation of just the URL", () => {
+    const argv = ["bun", "rb", "ffprobe", "https://example.com/video.mp4"];
+    expect(extractProbeArgs(argv)).toEqual(["https://example.com/video.mp4"]);
   });
 
-  it("does not false-positive on a scheme-like prefix without //", () => {
-    expect(isLocalSource("http:video.mp4")).toBe(true);
+  it("strips recognized CLI-level flags out of the ffprobe args", () => {
+    const argv = ["bun", "rb", "ffprobe", "-show_format", "--timeout", "30", "--json", "https://example.com/video.mp4"];
+    expect(extractProbeArgs(argv)).toEqual(["-show_format", "https://example.com/video.mp4"]);
+  });
+
+  it("returns an empty array when the ffprobe subcommand is missing", () => {
+    expect(extractProbeArgs(["bun", "rb"])).toEqual([]);
+  });
+
+  it("returns an empty array for no positional args", () => {
+    expect(extractProbeArgs(["bun", "rb", "ffprobe", "--json"])).toEqual([]);
+  });
+});
+
+describe("extractGlobalFlags", () => {
+  it("defaults to no flags and the default timeout", () => {
+    expect(extractGlobalFlags(["bun", "rb", "ffprobe", "https://example.com/video.mp4"])).toEqual({
+      json: false,
+      quiet: false,
+      noWait: false,
+      timeout: 60,
+    });
+  });
+
+  it("parses --json, --quiet, --no-wait", () => {
+    const argv = ["bun", "rb", "ffprobe", "--json", "--quiet", "--no-wait", "https://example.com/video.mp4"];
+    const flags = extractGlobalFlags(argv);
+    expect(flags.json).toBe(true);
+    expect(flags.quiet).toBe(true);
+    expect(flags.noWait).toBe(true);
+  });
+
+  it("forwards --timeout into the parsed flags", () => {
+    const argv = ["bun", "rb", "ffprobe", "--timeout", "45", "https://example.com/video.mp4"];
+    expect(extractGlobalFlags(argv).timeout).toBe(45);
+  });
+
+  it("clamps --timeout to the API max via resolveTimeout", () => {
+    const argv = ["bun", "rb", "ffprobe", "--timeout", "9999", "https://example.com/video.mp4"];
+    expect(extractGlobalFlags(argv).timeout).toBe(900);
   });
 });
 
@@ -63,13 +93,6 @@ describe("resolveTimeout", () => {
   });
 });
 
-describe("buildProbeParams", () => {
-  it("always forwards timeout so it bounds server-side probe execution", () => {
-    expect(buildProbeParams(60).timeout).toBe(60);
-    expect(buildProbeParams(900).timeout).toBe(900);
-  });
-});
-
 describe("resolveWaitBudgetMs", () => {
   it("outlasts the server-side timeout by a margin", () => {
     expect(resolveWaitBudgetMs(900)).toBe((900 + 60) * 1000);
@@ -86,60 +109,77 @@ describe("resolveWaitBudgetMs", () => {
   });
 });
 
-describe("selectPayload", () => {
-  const data = {
-    summary: { kind: "video", durationSec: 12.5 },
-    format: { name: "mp4" },
-    streams: [{ index: 0 }],
-    chapters: [],
-  };
-
-  it("returns just the summary by default", () => {
-    expect(selectPayload(data, false)).toEqual(data.summary);
+describe("buildCommand", () => {
+  it("joins a minimal URL-only invocation into a raw ffprobe command", () => {
+    expect(buildCommand(["https://example.com/video.mp4"])).toBe("ffprobe https://example.com/video.mp4");
   });
 
-  it("returns the full data object with --raw", () => {
-    expect(selectPayload(data, true)).toEqual(data);
+  it("joins ffprobe flags plus the URL, in argv order", () => {
+    expect(buildCommand(["-show_format", "-show_streams", "https://example.com/video.mp4"])).toBe(
+      "ffprobe -show_format -show_streams https://example.com/video.mp4",
+    );
+  });
+
+  it("shell-escapes args containing shell-special characters", () => {
+    const command = buildCommand(["-select_streams", "v:0", "https://example.com/a b.mp4"]);
+    expect(command).toBe("ffprobe -select_streams v:0 'https://example.com/a b.mp4'");
   });
 });
 
-describe("ffprobe local-file upload (reuses the ffmpeg upload path)", () => {
-  let tmpDir: string;
-
-  beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "rb-ffprobe-test-"));
+describe("buildProbeParams", () => {
+  it("always forwards command and timeout so they reach the API", () => {
+    const params = buildProbeParams("ffprobe https://example.com/video.mp4", 60);
+    expect(params.command).toBe("ffprobe https://example.com/video.mp4");
+    expect(params.timeout).toBe(60);
   });
 
-  afterEach(() => {
-    fs.rmSync(tmpDir, { recursive: true, force: true });
+  it("forwards the timeout the caller resolved, unmodified", () => {
+    expect(buildProbeParams("ffprobe url", 900).timeout).toBe(900);
+  });
+});
+
+describe("formatSummary", () => {
+  it("formats a video summary with resolution and fps", () => {
+    const summary: ProbeSummary = {
+      kind: "video",
+      container: "mp4",
+      durationSec: 75,
+      video: { codec: "h264", width: 1920, height: 1080, fps: 30 },
+    };
+    expect(formatSummary(summary)).toBe("Video  mp4  1:15  1920x1080  30fps");
   });
 
-  it("uploads a single local source and rewrites it to the asset URL", async () => {
-    const localPath = path.join(tmpDir, "clip.mp4");
-    fs.writeFileSync(localPath, "fake");
-
-    const mockClient = {
-      uploads: { create: mock(() => Promise.resolve({ url: "https://cdn.rendobar.com/uploads/clip.mp4" })) },
-    } as unknown as Parameters<typeof uploadLocalFiles>[2];
-
-    const rewritten = await uploadLocalFiles(
-      [localPath],
-      [{ index: 0, value: localPath, isLocal: true }],
-      mockClient,
-    );
-
-    expect(mockClient.uploads.create).toHaveBeenCalledTimes(1);
-    expect(rewritten[0]).toBe("https://cdn.rendobar.com/uploads/clip.mp4");
+  it("formats an audio summary with codec and channels", () => {
+    const summary: ProbeSummary = {
+      kind: "audio",
+      container: "mp3",
+      durationSec: 200,
+      audio: { codec: "mp3", channels: 2 },
+    };
+    expect(formatSummary(summary)).toBe("Audio  mp3  3:20  mp3  2ch");
   });
 
-  it("throws a clear error for a missing local file", async () => {
-    const missingPath = path.join(tmpDir, "missing.mp4");
-    const mockClient = {
-      uploads: { create: mock(() => Promise.resolve({ url: "https://cdn.rendobar.com/uploads/x.mp4" })) },
-    } as unknown as Parameters<typeof uploadLocalFiles>[2];
+  it("formats an image summary with dimensions", () => {
+    const summary: ProbeSummary = {
+      kind: "image",
+      container: "png",
+      image: { codec: "png", width: 512, height: 512 },
+    };
+    expect(formatSummary(summary)).toBe("Image  png  512x512");
+  });
 
-    await expect(
-      uploadLocalFiles([missingPath], [{ index: 0, value: missingPath, isLocal: true }], mockClient),
-    ).rejects.toThrow(/File not found/);
+  it("degrades gracefully for the other kind and missing fields", () => {
+    const summary: ProbeSummary = { kind: "other" };
+    expect(formatSummary(summary)).toBe("Other  unknown");
+  });
+
+  it("formats an hour-plus duration as h:mm:ss", () => {
+    const summary: ProbeSummary = {
+      kind: "video",
+      container: "mkv",
+      durationSec: 3661,
+      video: {},
+    };
+    expect(formatSummary(summary)).toBe("Video  mkv  1:01:01");
   });
 });

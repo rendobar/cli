@@ -84,7 +84,7 @@ rb login
 rb ffmpeg -i input.mp4 -vf "drawtext=text='PREVIEW':fontsize=48:fontcolor=white@0.5" output.mp4
 
 # Probe a video's metadata (duration, codec, resolution, fps, ...)
-rb ffprobe input.mp4
+rb ffprobe https://example.com/input.mp4
 
 # Run rb with no args to see the welcome screen and all available commands
 rb
