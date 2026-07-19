@@ -33,52 +33,77 @@ const MAX_TIMEOUT_SEC = 900;
 // (rendobar/rendobar, raw-command redesign). The SDK types `data` as
 // `unknown` because `jobs.create`/`jobs.wait` are generic over job type --
 // these interfaces encode the ffprobe-specific shape so the rest of the
-// command works with real fields instead of `unknown`. `summary` is always
-// present; every other field is best-effort probe output.
+// command works with real fields instead of `unknown`. `summary` is present
+// for the normal/JSON-parsed case; `stdout` carries raw ffprobe text when the
+// user requested a non-JSON output format instead. Every field beyond that is
+// best-effort probe output.
 
 interface StreamCounts {
   video?: number;
   audio?: number;
   subtitle?: number;
   data?: number;
+  attachment?: number;
 }
 
 interface SummaryCommon {
   container?: string;
-  durationSec?: number;
+  formatLongName?: string;
+  durationSec?: number | null;
   sizeBytes?: number;
   bitrateBps?: number;
+  startTimeSec?: number;
   streamCounts?: StreamCounts;
   tags?: Record<string, string>;
 }
 
 interface VideoBlock {
   codec?: string;
+  profile?: string;
   width?: number;
   height?: number;
+  displayAspectRatio?: string;
+  pixelFormat?: string;
+  bitDepth?: number;
   fps?: number;
+  isVariableFrameRate?: boolean;
+  rotation?: number;
+  isHdr?: boolean;
+  bitrateBps?: number;
+  language?: string;
 }
 
 interface AudioBlock {
   codec?: string;
+  profile?: string;
   channels?: number;
-  sampleRateHz?: number;
+  channelLayout?: string;
+  sampleRate?: number;
+  bitrateBps?: number;
+  language?: string;
 }
 
 interface ImageBlock {
   codec?: string;
   width?: number;
   height?: number;
+  pixelFormat?: string;
+  bitDepth?: number;
 }
 
 export type ProbeSummary =
-  | (SummaryCommon & { kind: "video"; video: VideoBlock; audio?: AudioBlock })
+  | (SummaryCommon & { kind: "video"; video: VideoBlock; audio?: AudioBlock | null })
   | (SummaryCommon & { kind: "audio"; audio: AudioBlock })
   | (SummaryCommon & { kind: "image"; image: ImageBlock })
   | (SummaryCommon & { kind: "other" });
 
-interface ProbeData {
-  summary: ProbeSummary;
+export interface ProbeData {
+  // `summary` is present for the normal/JSON-parsed probe case. It's absent
+  // when the user asked ffprobe for a non-JSON output format (csv/xml, or
+  // `-of default`) -- there's nothing to summarize, so `stdout` carries the
+  // raw ffprobe text instead. Exactly one of the two is set.
+  summary?: ProbeSummary;
+  stdout?: string;
   format?: unknown;
   streams?: unknown;
   chapters?: unknown;
@@ -183,8 +208,15 @@ export function extractProbeArgs(argv: string[]): string[] {
   return result;
 }
 
-/** `12` -> `"12"`, `75` -> `"1:15"`, `3661` -> `"1:01:01"`. */
+/** Strips trailing zeros (and a bare trailing dot) so `24.00` -> `24`, `23.50` -> `23.5`. */
+function fmtNum(n: number, decimals = 2): string {
+  const fixed = n.toFixed(decimals);
+  return fixed.includes(".") ? fixed.replace(/0+$/, "").replace(/\.$/, "") : fixed;
+}
+
+/** `12` -> `"12s"`, `5.01` -> `"5.01s"` (sub-minute, fractional), `75` -> `"1:15"`, `3661` -> `"1:01:01"`. */
 function fmtDuration(sec: number): string {
+  if (sec < 60) return `${fmtNum(sec)}s`;
   const total = Math.round(sec);
   const h = Math.floor(total / 3600);
   const m = Math.floor((total % 3600) / 60);
@@ -193,23 +225,119 @@ function fmtDuration(sec: number): string {
   return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
 }
 
-/** One-line concise summary: kind, container, duration, plus per-kind detail. */
-export function formatSummary(summary: ProbeSummary): string {
+/** `449000` -> `"449 kbps"`, `2_500_000` -> `"2.5 Mbps"`. */
+function fmtBitrate(bps: number): string {
+  if (bps >= 1_000_000) return `${fmtNum(bps / 1_000_000, 1)} Mbps`;
+  return `${Math.round(bps / 1000)} kbps`;
+}
+
+/** `48000` -> `"48 kHz"`, `44100` -> `"44.1 kHz"`. */
+function fmtHz(hz: number): string {
+  return `${fmtNum(hz / 1000, 1)} kHz`;
+}
+
+const DOT = pc.dim("·");
+
+/** `Video · mov,mp4,m4a,3gp,3g2,mj2 · 5.01s · 344 KB` -- kind, container, duration, size. */
+function formatHeaderLine(summary: ProbeSummary): string {
   const kindLabel = summary.kind.charAt(0).toUpperCase() + summary.kind.slice(1);
-  const parts = [kindLabel, summary.container ?? "unknown"];
-  if (summary.durationSec !== undefined) parts.push(fmtDuration(summary.durationSec));
+  const parts = [pc.bold(kindLabel)];
+  const container = summary.container ?? summary.formatLongName;
+  if (container) parts.push(container);
+  if (summary.durationSec != null) parts.push(fmtDuration(summary.durationSec));
+  if (summary.sizeBytes != null) parts.push(fmtBytes(summary.sizeBytes));
+  return parts.join(` ${DOT} `);
+}
+
+const ROW_LABEL_WIDTH = 7;
+
+function formatRow(label: string, fields: string[]): string {
+  return `  ${pc.dim(label.padEnd(ROW_LABEL_WIDTH))}${fields.join("   ")}`;
+}
+
+function formatVideoRow(video: VideoBlock): string {
+  const fields: string[] = [];
+  if (video.codec) fields.push(video.profile ? `${video.codec} ${video.profile}` : video.codec);
+  if (video.width && video.height) {
+    const dar = video.displayAspectRatio ? ` (${video.displayAspectRatio})` : "";
+    fields.push(`${video.width}x${video.height}${dar}`);
+  }
+  if (video.fps) fields.push(`${fmtNum(video.fps)} fps${video.isVariableFrameRate ? " (VFR)" : ""}`);
+  const depthFormat = [video.bitDepth ? `${video.bitDepth}-bit` : null, video.pixelFormat].filter(Boolean).join(" ");
+  if (depthFormat) fields.push(depthFormat);
+  if (video.bitrateBps) fields.push(fmtBitrate(video.bitrateBps));
+  if (video.isHdr) fields.push(pc.yellow("HDR"));
+  if (video.rotation) fields.push(`rotated ${video.rotation}°`);
+  if (video.language) fields.push(`[${video.language}]`);
+  return formatRow("Video", fields);
+}
+
+function formatAudioRow(audio: AudioBlock): string {
+  const fields: string[] = [];
+  if (audio.codec) fields.push(audio.profile ? `${audio.codec} ${audio.profile}` : audio.codec);
+  if (audio.channelLayout) fields.push(audio.channelLayout);
+  else if (audio.channels) fields.push(`${audio.channels}ch`);
+  if (audio.sampleRate) fields.push(fmtHz(audio.sampleRate));
+  if (audio.bitrateBps) fields.push(fmtBitrate(audio.bitrateBps));
+  if (audio.language) fields.push(`[${audio.language}]`);
+  return formatRow("Audio", fields);
+}
+
+function formatImageRow(image: ImageBlock): string {
+  const fields: string[] = [];
+  if (image.width && image.height) fields.push(`${image.width}x${image.height}`);
+  const depthFormat = [image.bitDepth ? `${image.bitDepth}-bit` : null, image.pixelFormat].filter(Boolean).join(" ");
+  if (depthFormat) fields.push(depthFormat);
+  return formatRow("Image", fields);
+}
+
+function formatStreamCountsRow(counts: StreamCounts | undefined): string | null {
+  if (!counts) return null;
+  const fields = (["video", "audio", "subtitle", "data", "attachment"] as const)
+    .filter((key) => counts[key])
+    .map((key) => `${counts[key]} ${key}`);
+  if (fields.length === 0) return null;
+  return formatRow("Streams", fields);
+}
+
+/**
+ * Readable multi-line summary block: a header line (kind, container,
+ * duration, size) plus a detail row per stream kind found on the media.
+ * Only present fields are rendered -- ffprobe's own data is best-effort, and
+ * a field this media doesn't carry (e.g. no `displayAspectRatio`) is simply
+ * skipped rather than printed as `undefined`.
+ */
+export function formatSummaryBlock(summary: ProbeSummary): string {
+  const lines = [formatHeaderLine(summary)];
+  const rows: string[] = [];
 
   if (summary.kind === "video") {
-    if (summary.video.width && summary.video.height) parts.push(`${summary.video.width}x${summary.video.height}`);
-    if (summary.video.fps) parts.push(`${summary.video.fps}fps`);
+    rows.push(formatVideoRow(summary.video));
+    if (summary.audio) rows.push(formatAudioRow(summary.audio));
   } else if (summary.kind === "audio") {
-    if (summary.audio.codec) parts.push(summary.audio.codec);
-    if (summary.audio.channels) parts.push(`${summary.audio.channels}ch`);
+    rows.push(formatAudioRow(summary.audio));
   } else if (summary.kind === "image") {
-    if (summary.image.width && summary.image.height) parts.push(`${summary.image.width}x${summary.image.height}`);
+    rows.push(formatImageRow(summary.image));
+  } else {
+    const streamsRow = formatStreamCountsRow(summary.streamCounts);
+    if (streamsRow) rows.push(streamsRow);
   }
 
-  return parts.join("  ");
+  if (rows.length > 0) lines.push("", ...rows);
+  return lines.join("\n");
+}
+
+/**
+ * Decides what to print for the non-JSON success path. `summary` renders as
+ * the readable block; a `summary`-less response means the user asked ffprobe
+ * for a non-JSON output format (csv/xml/-of default), so its raw `stdout` is
+ * printed verbatim instead -- exactly what they asked for, nothing summarized.
+ * Returns null when the response carries neither (unexpected API response).
+ */
+export function resolveOutputText(data: ProbeData): string | null {
+  if (data.summary) return formatSummaryBlock(data.summary);
+  if (data.stdout !== undefined) return data.stdout;
+  return null;
 }
 
 // ── Help ───────────────────────────────────────────────────────
@@ -359,8 +487,13 @@ export default defineCommand({
 
       // ── Output modes ─────────────────────────────────────
       // Structured answer goes to stdout so it can be piped (e.g. to jq).
-      if (flags.json) console.log(JSON.stringify(data, null, 2));
-      else console.log(formatSummary(data.summary));
+      if (flags.json) {
+        console.log(JSON.stringify(data, null, 2));
+      } else {
+        const text = resolveOutputText(data);
+        if (text !== null) console.log(text);
+        else if (!flags.quiet) process.stderr.write(pc.red("  ✗ Probe completed with no summary or output\n"));
+      }
 
       if (!flags.quiet && isTTY) process.stderr.write(`\n${dashboardLine}`);
 
