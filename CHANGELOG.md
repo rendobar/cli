@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.10.0](https://github.com/rendobar/cli/compare/v1.9.0...v1.10.0) (2026-07-20)
+
+
+### Features
+
+* anonymous opt-out usage telemetry ([#112](https://github.com/rendobar/cli/issues/112)) ([a119dd0](https://github.com/rendobar/cli/commit/a119dd0f2adb8b4acfabec4a52f74a011fba37f2))
+
 ## [1.9.0](https://github.com/rendobar/cli/compare/v1.8.0...v1.9.0) (2026-07-19)
 
 
