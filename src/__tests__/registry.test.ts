@@ -2,8 +2,8 @@ import { describe, it, expect } from "bun:test";
 import { COMMANDS, GROUP_ORDER, commandNames, toSubCommands } from "../registry.js";
 
 describe("registry", () => {
-  it("lists the seven commands", () => {
-    expect(commandNames().sort()).toEqual(["doctor", "ffmpeg", "ffprobe", "login", "logout", "update", "whoami"]);
+  it("lists the eight commands", () => {
+    expect(commandNames().sort()).toEqual(["doctor", "ffmpeg", "ffprobe", "login", "logout", "telemetry", "update", "whoami"]);
   });
   it("every command's group is in GROUP_ORDER", () => {
     for (const c of COMMANDS) expect(GROUP_ORDER).toContain(c.group);
