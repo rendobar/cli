@@ -5,11 +5,43 @@
  * from the central registry. Unknown commands and stray ffmpeg flags are hinted.
  */
 import { spawn } from "node:child_process";
-import { defineCommand, runMain, renderUsage, type CommandDef } from "citty";
+import { defineCommand, runMain, renderUsage, type CommandDef, type SubCommandsDef } from "citty";
 import { VERSION } from "./generated/version.js";
 import { toSubCommands, commandNames, COMMANDS } from "./registry.js";
 import { buildState, renderWelcome, renderHelp, renderWelcomeJson } from "./lib/welcome.js";
 import { checkForUpdate, isRefreshDue } from "./lib/update-check.js";
+import { captureCommand, maybeShowFirstRunNotice } from "./lib/telemetry.js";
+
+// Wrap each subcommand's run() so we emit ONE anonymous `cli_command` event per
+// invocation (command name, success, duration — never args or files). Awaited in
+// finally so it flushes before the process exits; bounded + never throws, so it
+// can't delay or break a command. See src/lib/telemetry.ts.
+function instrumentSubCommands(subs: SubCommandsDef): SubCommandsDef {
+  const out: SubCommandsDef = {};
+  for (const [name, resolvable] of Object.entries(subs)) {
+    out[name] = async () => {
+      const cmd: CommandDef =
+        typeof resolvable === "function" ? await resolvable() : await resolvable;
+      const origRun = cmd.run;
+      if (typeof origRun !== "function") return cmd;
+      const run: typeof origRun = async (ctx) => {
+        maybeShowFirstRunNotice();
+        const start = Date.now();
+        let ok = true;
+        try {
+          return await origRun(ctx);
+        } catch (err) {
+          ok = false;
+          throw err;
+        } finally {
+          await captureCommand(name, ok, Date.now() - start);
+        }
+      };
+      return { ...cmd, run };
+    };
+  }
+  return out;
+}
 
 // Compile-time define from `bun build --compile --define`. Undefined in dev mode
 // (`bun run src/main.ts`), where process.execPath is the bun runtime, not `rb`.
@@ -87,7 +119,7 @@ const main = defineCommand({
     "no-wait": { type: "boolean", description: "Submit and exit immediately", default: false },
   },
   subCommands: {
-    ...toSubCommands(),
+    ...instrumentSubCommands(toSubCommands()),
     help: helpCommand,
   },
   async run() {

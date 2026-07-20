@@ -102,6 +102,19 @@ rb update
 
 Self-replaces the binary in-place with checksum verification and automatic rollback if the new binary fails.
 
+## Telemetry
+
+The CLI sends anonymous usage stats so we can see which commands matter and make it better. Each run reports one event: the command name, whether it succeeded, how long it took, the CLI version, and your OS.
+
+It never sends your file names, arguments, URLs, credentials, or account identity. The identifier is a random per-machine id, not tied to your account.
+
+It is off in CI automatically. To turn it off anywhere:
+
+```bash
+rb telemetry off          # or: rb telemetry status
+export DO_NOT_TRACK=1      # or RENDOBAR_TELEMETRY=0
+```
+
 ## What is Rendobar?
 
 Rendobar is a serverless media processing platform. Run FFmpeg jobs and burn captions with one API call. Credit-based billing. MCP-native for AI agents.
