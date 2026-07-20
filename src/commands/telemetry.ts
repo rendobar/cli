@@ -40,6 +40,7 @@ export default defineCommand({
       if (!s.keyPresent) {
         process.stderr.write(pc.dim("  No telemetry endpoint configured in this build.\n"));
       }
+      process.stderr.write(pc.dim(`  Anonymous id: ${s.anonymousId}\n`));
       process.stderr.write(pc.dim("  Anonymous only: no files, arguments, or credentials are collected.\n"));
       return;
     }
