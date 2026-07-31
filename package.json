@@ -27,7 +27,7 @@
   },
   "dependencies": {
     "@clack/prompts": "^1.2.0",
-    "@rendobar/sdk": "^4.0.0",
+    "@rendobar/sdk": "^5.0.0",
     "citty": "^0.2.0",
     "picocolors": "^1.1.1"
   },
@@ -38,5 +38,5 @@
     "lefthook": "^2.0.0",
     "typescript": "^7.0.0"
   },
-  "packageManager": "pnpm@11.15.1"
+  "packageManager": "pnpm@11.17.0"
 }
