@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.11.0](https://github.com/rendobar/cli/compare/v1.10.1...v1.11.0) (2026-07-31)
+
+
+### Features
+
+* add rb generate and rb edit for cloud image generation ([#121](https://github.com/rendobar/cli/issues/121)) ([b12a589](https://github.com/rendobar/cli/commit/b12a589cb3704fe9553768fea3fd87864094b493))
+
 ## [1.10.1](https://github.com/rendobar/cli/compare/v1.10.0...v1.10.1) (2026-07-31)
 
 
