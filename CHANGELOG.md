@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.10.1](https://github.com/rendobar/cli/compare/v1.10.0...v1.10.1) (2026-07-31)
+
+
+### Bug Fixes
+
+* **deps:** bump dependency @rendobar/sdk to v5 ([#119](https://github.com/rendobar/cli/issues/119)) ([70d7fb8](https://github.com/rendobar/cli/commit/70d7fb8f23faa732fec0767f2f66e8e479676f39))
+
 ## [1.10.0](https://github.com/rendobar/cli/compare/v1.9.0...v1.10.0) (2026-07-20)
 
 
