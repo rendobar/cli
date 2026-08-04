@@ -2,7 +2,7 @@
   "name": "rendobar-cli",
   "version": "1.11.0",
   "private": true,
-  "description": "Rendobar CLI — serverless video processing from your terminal.",
+  "description": "Rendobar CLI: media processing and AI generation from your terminal.",
   "license": "MIT",
   "repository": {
     "type": "git",
