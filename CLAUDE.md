@@ -38,11 +38,17 @@ Critical rules embedded here so you don't need to context-switch:
 (lowercase except in URLs / package names), `https://www.rendobar.com`,
 `http://rendobar.com`, apex page links without a trailing slash.
 
-### `package.json description` — em-dash, sentence case
+### `package.json description` — colon, sentence case
 
-- ✅ `"Rendobar CLI — serverless video processing from your terminal."`
+The em-dash is BANNED. It was the 2024–2025 convention here, but apex
+`writing-style.md` bans it site-wide as an AI-aesthetic tell, and apex
+`brand-consistency.md` names the old string below as its canonical BAD example.
+This section used to require the opposite, which is how the em-dash survived
+until 2026-08-04.
+
+- ✅ `"Rendobar CLI: media processing and AI generation from your terminal."`
+- ❌ `"Rendobar CLI — serverless video processing from your terminal."` (em-dash, and video-only)
 - ❌ `"Rendobar | CLI Tool"` (pipe, title case)
-- ❌ `"Rendobar CLI - serverless..."` (ASCII hyphen instead of em-dash)
 
 ### README + issue templates — trailing slash on apex page links
 
