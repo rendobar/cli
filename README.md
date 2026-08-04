@@ -6,8 +6,8 @@
 
 <h1 align="center">Rendobar CLI</h1>
 <p align="center">
-  <strong>Serverless video processing from your terminal.</strong><br>
-  Run FFmpeg jobs and burn captions in the cloud with one command.
+  <strong>Media processing and AI generation from your terminal.</strong><br>
+  Run FFmpeg, compose video, burn captions and generate images in the cloud with one command.
 </p>
 <p align="center">
   <a href="https://rendobar.com">Website</a> •
@@ -72,7 +72,7 @@ irm https://rendobar.com/uninstall.ps1 | iex
 
 ### Inspect before running
 
-The install/uninstall scripts are [source-visible in this repo](https://github.com/rendobar/cli/blob/main/install.sh). `rendobar.com/install.sh` redirects here — download and read first if you prefer.
+The install/uninstall scripts are [source-visible in this repo](https://github.com/rendobar/cli/blob/main/install.sh). `rendobar.com/install.sh` redirects here. Download and read it first if you prefer.
 
 ## Quick start
 
@@ -117,7 +117,7 @@ export DO_NOT_TRACK=1      # or RENDOBAR_TELEMETRY=0
 
 ## What is Rendobar?
 
-Rendobar is a serverless media processing platform. Run FFmpeg jobs and burn captions with one API call. Credit-based billing. MCP-native for AI agents.
+Rendobar is a serverless media processing platform. Run FFmpeg, compose video from a timeline, burn captions, compress to a budget, and generate images with one API call. Credit-based billing. MCP-native for AI agents.
 
 - **Website**: https://rendobar.com
 - **Docs**: https://rendobar.com/docs/
@@ -164,4 +164,4 @@ Commit messages must follow [Conventional Commits](https://www.conventionalcommi
 
 ## License
 
-MIT — see [LICENSE](./LICENSE).
+MIT. See [LICENSE](./LICENSE).
