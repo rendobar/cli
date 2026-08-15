@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.1](https://github.com/rendobar/cli/compare/v1.12.0...v1.12.1) (2026-08-15)
+
+
+### Bug Fixes
+
+* refresh the bundled prompt with the current template ([#131](https://github.com/rendobar/cli/issues/131)) ([21b2d07](https://github.com/rendobar/cli/commit/21b2d0756e38696f43c7710e2185ea36ddd2c746))
+
 ## [1.12.0](https://github.com/rendobar/cli/compare/v1.11.0...v1.12.0) (2026-08-15)
 
 
