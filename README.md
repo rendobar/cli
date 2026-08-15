@@ -86,6 +86,9 @@ rb ffmpeg -i input.mp4 -vf "drawtext=text='PREVIEW':fontsize=48:fontcolor=white@
 # Probe a video's metadata (duration, codec, resolution, fps, ...)
 rb ffprobe https://example.com/input.mp4
 
+# Print the AI integration prompt (paste into Claude, ChatGPT, or Cursor)
+rb prompt --copy
+
 # Run rb with no args to see the welcome screen and all available commands
 rb
 ```

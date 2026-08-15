@@ -15,6 +15,7 @@ export const COMMANDS: readonly CommandEntry[] = [
   { name: "ffprobe",   summary: "Run a raw ffprobe command",             group: "CORE",    load: () => import("./commands/ffprobe.js") },
   { name: "generate",  summary: "Generate an image from a text prompt",  group: "CORE",    load: () => import("./commands/generate.js") },
   { name: "edit",      summary: "Edit an image from a text instruction", group: "CORE",    load: () => import("./commands/edit.js") },
+  { name: "prompt",    summary: "Print the AI integration prompt",       group: "CORE",    load: () => import("./commands/prompt.js") },
   { name: "login",     summary: "Authenticate this machine",            group: "ACCOUNT", load: () => import("./commands/login.js") },
   { name: "logout",    summary: "Remove stored credentials",            group: "ACCOUNT", load: () => import("./commands/logout.js") },
   { name: "whoami",    summary: "Show identity, plan, and balance",     group: "ACCOUNT", load: () => import("./commands/whoami.js") },
