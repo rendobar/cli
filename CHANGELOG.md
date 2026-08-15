@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.0](https://github.com/rendobar/cli/compare/v1.11.0...v1.12.0) (2026-08-15)
+
+
+### Features
+
+* add rb prompt to print the AI integration prompt ([#129](https://github.com/rendobar/cli/issues/129)) ([f50d81f](https://github.com/rendobar/cli/commit/f50d81f3a890b2cff2e4d7f07cdfd3ad8eec8bf4))
+
 ## [1.11.0](https://github.com/rendobar/cli/compare/v1.10.1...v1.11.0) (2026-07-31)
 
 
