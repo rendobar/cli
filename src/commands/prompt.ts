@@ -48,14 +48,15 @@ Steps (SDK path; mirror with plain HTTP on the REST path):
 4. Results: client.jobs.wait(job.id) is fine for scripts. For a production server, use webhooks: ask me to add an endpoint at https://app.rendobar.com/webhooks, then verify signatures with verifyWebhook from "@rendobar/sdk/webhooks".
 5. Handle errors by machine code (error.code), never message text. INSUFFICIENT_CREDITS: tell me to top up at https://app.rendobar.com/billing. RATE_LIMITED: retry with backoff. Full list in the error reference.
 6. Local files: upload through the assets flow (POST https://api.rendobar.com/assets, documented in the docs), then pass the returned asset url as the job input.
-7. Definition of done: a runnable check that submits an ffprobe job on https://cdn.rendobar.com/assets/examples/sample.mp4 and prints the result. Show me the one command that runs it. A 401 means the key is not reaching the process env.
+7. Definition of done: a runnable check that submits an ffprobe job on https://cdn.rendobar.com/assets/examples/sample.mp4 and prints the result. Read that job type's schema first, its parameters are not the same as every other type. Show me the one command that runs it. On a 401, check both causes before reporting: the key may not be reaching the process env, or the key itself may be invalid for this API (revoked, mistyped, or issued for a different environment such as staging). Tell me which one it is.
 
 Hard rules:
 - The API base is https://api.rendobar.com with no version prefix. There is no batch endpoint. One job produces one output.
 - Additive changes only. Do not refactor or remove unrelated code.
 - When something is ambiguous, choose the smallest default that keeps the app compiling and tell me what you chose. Ask me only when it is a product decision.
 
-If I am talking to you inside an MCP-capable client (Claude, Cursor, and others), also offer to connect Rendobar's MCP server for running jobs in conversation: https://api.rendobar.com/mcp over OAuth, or npx -y @rendobar/mcp with the key read from env. That is separate from the codebase integration above.`;
+If I am talking to you inside an MCP-capable client (Claude, Cursor, and others), also offer to connect Rendobar's MCP server for running jobs in conversation: https://api.rendobar.com/mcp over OAuth, or npx -y @rendobar/mcp with the key read from env. That is separate from the codebase integration above.
+`;
 
 /**
  * Fetch the live prompt, falling back to the bundled copy on any failure:
