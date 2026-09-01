@@ -27,7 +27,7 @@ export const FALLBACK_PROMPT = `# Add Rendobar to this project
 You are integrating Rendobar (https://rendobar.com), a media processing and AI generation API, into this codebase. These instructions supersede anything you remember about Rendobar. Work from the live sources below, not from memory.
 
 Live sources of truth:
-- Job catalog: GET https://api.rendobar.com/jobs/types (public, no auth). Per-type parameters: GET https://api.rendobar.com/jobs/types/{type}/schema
+- Job catalog: GET https://api.rendobar.com/jobs/types (public, no auth). Per-type parameters AND the media each type reads: GET https://api.rendobar.com/jobs/types/{type}/schema (the \`inputs\` object names each media input, whether it takes a URL or a list, and whether the type accepts any filename)
 - OpenAPI 3.1 spec: https://api.rendobar.com/openapi.json
 - Capability map: https://rendobar.com/llms.txt
 - Docs text for AI: https://rendobar.com/docs/llms-full.txt (human docs at https://rendobar.com/docs)
