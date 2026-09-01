@@ -200,7 +200,13 @@ export default defineCommand({
       client_id: CLI_CLIENT_ID,
       redirect_uri: REDIRECT_URI,
       response_type: "code",
-      scope: "openid media:full offline_access",
+      // Must match what the rendobar-cli client is registered with, in
+      // packages/db/seeds/cli-oauth-client.sql. `media:full` was retired with
+      // the scope vocabulary and now expands to nothing, so requesting it still
+      // completed the flow and returned a token carrying zero scopes: login
+      // reported success and every call after it answered 403.
+      scope:
+        "openid offline_access jobs:write assets:write webhooks:write billing:read orgs:read",
       code_challenge: codeChallenge,
       code_challenge_method: "S256",
       state,
