@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.2](https://github.com/rendobar/cli/compare/v1.12.1...v1.12.2) (2026-09-01)
+
+
+### Bug Fixes
+
+* request the current scope vocabulary at login ([#145](https://github.com/rendobar/cli/issues/145)) ([77a4a61](https://github.com/rendobar/cli/commit/77a4a617eece2326c557bf3a6934d5f66923af69))
+
 ## [1.12.1](https://github.com/rendobar/cli/compare/v1.12.0...v1.12.1) (2026-08-15)
 
 
