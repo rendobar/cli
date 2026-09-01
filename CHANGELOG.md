@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.3](https://github.com/rendobar/cli/compare/v1.12.2...v1.12.3) (2026-09-01)
+
+
+### Bug Fixes
+
+* report the CLI version in the client header ([#148](https://github.com/rendobar/cli/issues/148)) ([24204d5](https://github.com/rendobar/cli/commit/24204d510fe983b7aaade374514164fc30935c40))
+
 ## [1.12.2](https://github.com/rendobar/cli/compare/v1.12.1...v1.12.2) (2026-09-01)
 
 
