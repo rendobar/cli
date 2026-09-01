@@ -1,6 +1,6 @@
 {
   "name": "rendobar-cli",
-  "version": "1.12.2",
+  "version": "1.12.3",
   "private": true,
   "description": "Rendobar CLI: media processing and AI generation from your terminal.",
   "license": "MIT",
