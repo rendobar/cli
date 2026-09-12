@@ -22,13 +22,19 @@ export interface ParsedInput {
 }
 
 /**
- * A bare `http(s)://` value is remote; anything else is a local file path.
+ * Values the API fetches or resolves itself: a URL, a file in a connected
+ * bucket (`storage://`), or an uploaded asset (`asset://`).
+ */
+const REMOTE_PREFIXES = ["http://", "https://", "storage://", "asset://"];
+
+/**
+ * Anything without a remote prefix is a local file path.
  * Single source of truth for the local-vs-remote check -- `rb ffmpeg` and
  * `rb ffprobe` both upload local inputs before submission and must agree on
  * what counts as "local".
  */
 export function isLocalPath(value: string): boolean {
-  return !value.startsWith("http://") && !value.startsWith("https://");
+  return !REMOTE_PREFIXES.some((prefix) => value.startsWith(prefix));
 }
 
 export interface ParseResult {
