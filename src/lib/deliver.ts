@@ -124,7 +124,16 @@ export async function waitForDeliveries(
   let current = initial;
   while (current.some((d) => d.status === "pending") && now() < deadline) {
     await sleep(interval);
-    const next = parseDeliveries(await getJob(opts.signal));
+    let job: unknown;
+    try {
+      job = await getJob(opts.signal);
+    } catch (err) {
+      // The job already completed by the time we're waiting on deliveries, so a
+      // failed read here shouldn't crash the command. Ctrl+C still stops it.
+      if (opts.signal?.aborted) throw err;
+      continue;
+    }
+    const next = parseDeliveries(job);
     if (next.length > 0) current = next;
   }
   return current;

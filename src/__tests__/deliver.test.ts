@@ -49,6 +49,11 @@ describe("parseDeliveries", () => {
       { storageId: "b", status: "pending" },
     ]);
   });
+
+  it("keeps renamed: true from a raw entry", () => {
+    const job = { deliveries: [{ storageId: "a", status: "delivered", renamed: true }] };
+    expect(parseDeliveries(job)).toEqual([{ storageId: "a", status: "delivered", renamed: true }]);
+  });
 });
 
 describe("deliveryLine and deliveryExitCode", () => {
@@ -60,6 +65,11 @@ describe("deliveryLine and deliveryExitCode", () => {
     expect(deliveryLine(delivered)).toBe("Delivered to storage://prod-media/exports/clip.mp4");
     expect(deliveryLine(failed)).toBe("Not delivered to storage://archive, reason destination_denied");
     expect(deliveryLine(pending)).toContain("storage://backup");
+  });
+
+  it("notes a rename on a delivered, renamed delivery", () => {
+    const renamed: Delivery = { storageId: "prod-media", status: "delivered", path: "clip.mp4", renamed: true };
+    expect(deliveryLine(renamed).endsWith("(renamed, the name was taken)")).toBe(true);
   });
 
   it("exits 1 unless every delivery landed", () => {
@@ -96,9 +106,48 @@ describe("waitForDeliveries", () => {
     expect(settled).toEqual(pendingA);
     expect(reads).toBe(3);
   });
+
+  it("keeps waiting when a read fails, then settles once a read succeeds", async () => {
+    let calls = 0;
+    let clock = 0;
+    const settled = await waitForDeliveries(
+      async () => {
+        calls++;
+        if (calls === 1) throw new Error("network blip");
+        return { deliveries: [{ storageId: "a", status: "delivered", path: "x.mp4" }] };
+      },
+      pendingA,
+      {
+        timeoutMs: 60_000,
+        sleep: async (ms) => { clock += ms; },
+        now: () => clock,
+      },
+    );
+    expect(settled).toEqual([{ storageId: "a", status: "delivered", path: "x.mp4" }]);
+    expect(calls).toBe(2);
+  });
+
+  it("rethrows a failed read once the signal is already aborted", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    await expect(
+      waitForDeliveries(
+        async () => { throw new Error("aborted read"); },
+        pendingA,
+        {
+          timeoutMs: 60_000,
+          signal: controller.signal,
+          sleep: async () => {},
+          now: () => 0,
+        },
+      ),
+    ).rejects.toThrow("aborted read");
+  });
 });
 
 describe("finishDeliveries", () => {
+  // A non-generic stub can't satisfy StepRenderer.step's generic signature; the
+  // test only ever calls step and info, so `as never` stands in for the type.
   const steps = { step: async (_label: string, fn: () => Promise<unknown>) => fn(), info: () => {} } as never;
 
   it("returns 0 and reads nothing for a job with no deliveries", async () => {
