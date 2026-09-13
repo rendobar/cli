@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.13.0](https://github.com/rendobar/cli/compare/v1.12.4...v1.13.0) (2026-09-13)
+
+
+### Features
+
+* connected storage in rb ([#159](https://github.com/rendobar/cli/issues/159)) ([dc4ef49](https://github.com/rendobar/cli/commit/dc4ef49c91a75966b9e17c011f2bc3b9aa37fcaa))
+
 ## [1.12.4](https://github.com/rendobar/cli/compare/v1.12.3...v1.12.4) (2026-09-13)
 
 
