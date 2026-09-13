@@ -296,3 +296,14 @@ describe("downloadFilesToDir — set/stream into a local folder", () => {
     expect(fs.readFileSync(path.join(tmpDir, "frame_001.png"), "utf8")).toBe("PNG");
   });
 });
+
+describe("buildResult — deliveries", () => {
+  it("carries the deliveries the job reports", () => {
+    const r = buildResult("complete", undefined, { deliveries: [{ storageId: "prod-media", status: "pending" }] });
+    expect(r.deliveries).toEqual([{ storageId: "prod-media", status: "pending" }]);
+  });
+
+  it("is an empty list for a job with none", () => {
+    expect(buildResult("complete", undefined, {}).deliveries).toEqual([]);
+  });
+});
