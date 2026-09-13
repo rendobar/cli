@@ -215,7 +215,11 @@ export default defineCommand({
       }
       if (result.status === "cancelled") process.exit(130);
 
-      const exitCode = await finishDeliveries(steps, client, job.id, result, { signal: controller.signal, quiet: flags.quiet });
+      const exitCode = await finishDeliveries(steps, client, job.id, result, {
+        signal: controller.signal,
+        quiet: flags.quiet,
+        requested: destinations.length > 0,
+      });
 
       if (flags.json) { console.log(JSON.stringify(result)); process.exit(exitCode); }
 

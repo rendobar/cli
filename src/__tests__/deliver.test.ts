@@ -1,4 +1,4 @@
-import { describe, it, expect } from "bun:test";
+import { describe, it, expect, mock } from "bun:test";
 import {
   readDeliverFlags,
   parseDeliveries,
@@ -153,14 +153,41 @@ describe("finishDeliveries", () => {
   it("returns 0 and reads nothing for a job with no deliveries", async () => {
     let reads = 0;
     const client = { jobs: { get: async () => { reads++; return {}; } } };
-    expect(await finishDeliveries(steps, client, "job_1", { deliveries: [] }, { quiet: true })).toBe(0);
+    expect(await finishDeliveries(steps, client, "job_1", { deliveries: [] }, { quiet: true, requested: true })).toBe(0);
     expect(reads).toBe(0);
   });
 
   it("settles pending deliveries onto the result and returns 1 when one did not land", async () => {
     const client = { jobs: { get: async () => ({ deliveries: [{ storageId: "a", status: "failed", reason: "destination_denied" }] }) } };
     const result: { deliveries: Delivery[] } = { deliveries: [{ storageId: "a", status: "pending" }] };
-    expect(await finishDeliveries(steps, client, "job_1", result, { quiet: true, intervalMs: 0 })).toBe(1);
+    expect(await finishDeliveries(steps, client, "job_1", result, { quiet: true, intervalMs: 0, requested: true })).toBe(1);
     expect(result.deliveries).toEqual([{ storageId: "a", status: "failed", reason: "destination_denied" }]);
+  });
+
+  // A job the caller never asked to deliver anywhere can still carry a delivery
+  // (the org's default destination, or an unstored output the API already
+  // closed out). Waiting on that, or failing the command for it, is not this
+  // command's business -- only `--deliver` opts a run into caring.
+  it("returns 0 without waiting or printing when the delivery was not requested", async () => {
+    const notDeliverable: Delivery = { storageId: "a", status: "failed", reason: "not_deliverable" };
+    const getJob = mock(async () => ({ deliveries: [notDeliverable] }));
+    const step = mock(async (_label: string, fn: () => Promise<unknown>) => fn());
+    const info = mock(() => {});
+    const noisySteps = { step, info } as never;
+    const client = { jobs: { get: getJob } };
+    const result: { deliveries: Delivery[] } = { deliveries: [notDeliverable] };
+
+    expect(await finishDeliveries(noisySteps, client, "job_1", result, { quiet: false, requested: false })).toBe(0);
+    expect(getJob).toHaveBeenCalledTimes(0);
+    expect(step).toHaveBeenCalledTimes(0);
+    expect(info).toHaveBeenCalledTimes(0);
+    expect(result.deliveries).toEqual([notDeliverable]);
+  });
+
+  it("still returns 1 for the same delivery when --deliver was passed", async () => {
+    const notDeliverable: Delivery = { storageId: "a", status: "failed", reason: "not_deliverable" };
+    const client = { jobs: { get: async () => ({ deliveries: [notDeliverable] }) } };
+    const result: { deliveries: Delivery[] } = { deliveries: [notDeliverable] };
+    expect(await finishDeliveries(steps, client, "job_1", result, { quiet: true, requested: true })).toBe(1);
   });
 });

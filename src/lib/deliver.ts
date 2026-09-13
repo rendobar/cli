@@ -35,6 +35,8 @@ export interface FinishOptions {
   intervalMs?: number;
   signal?: AbortSignal;
   quiet: boolean;
+  /** Only true when the command itself passed --deliver. */
+  requested: boolean;
 }
 
 /**
@@ -143,7 +145,10 @@ export async function waitForDeliveries(
  * After a job completes: wait for its deliveries, print one line each, write the
  * settled list back onto the result for --json, and return the exit code the
  * command ends with. A job may carry deliveries without --deliver, through the
- * account's default destination, so this keys off the result rather than the flag.
+ * account's default destination, or as an unstored output the API already closed
+ * out as failed. Only a command that passed --deliver (`opts.requested`) waits on
+ * that or fails for it. An unrequested delivery is left exactly as the job read at
+ * completion reported it, so --json still carries it.
  */
 export async function finishDeliveries(
   steps: Pick<StepRenderer, "step" | "info">,
@@ -152,6 +157,7 @@ export async function finishDeliveries(
   result: { deliveries: Delivery[] },
   opts: FinishOptions,
 ): Promise<0 | 1> {
+  if (!opts.requested) return 0;
   if (result.deliveries.length === 0) return 0;
   const settle = () =>
     waitForDeliveries((signal) => client.jobs.get(jobId, { signal }), result.deliveries, {
