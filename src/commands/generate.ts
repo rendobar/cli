@@ -215,6 +215,10 @@ export default defineCommand({
       }
       if (result.status === "cancelled") process.exit(130);
 
+      // The job is already complete, so Ctrl+C from here on has nothing to
+      // cancel. Clearing jobId keeps the SIGINT handler from posting a
+      // cancel for a job that already finished.
+      jobId = undefined;
       const exitCode = await finishDeliveries(steps, client, job.id, result, {
         signal: controller.signal,
         quiet: flags.quiet,
