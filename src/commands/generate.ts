@@ -15,6 +15,7 @@ import pc from "picocolors";
 import { isApiError } from "@rendobar/sdk";
 import { getDashboardBaseUrl } from "../lib/auth.js";
 import { openSession } from "../lib/session.js";
+import { deliverFlagsOrExit, finishDeliveries } from "../lib/deliver.js";
 import { buildGenParams, parseIntFlag, parseFloatFlag } from "../lib/image-params.js";
 import { StepRenderer, waitForJob, downloadUrlToFile, type MachineContext } from "../lib/progress.js";
 
@@ -96,6 +97,7 @@ ${pc.bold("Flags:")}
   --quiet              No output, exit code only
   --no-wait            Submit and exit immediately (prints job ID)
   --url-only           Print the result URL only, download nothing
+  --deliver <uri>      Also write the output to connected storage, e.g. storage://prod-media/exports (repeatable)
 
 ${pc.dim("Always prints the generated image's URL; add --output to also save it locally.")}
 ${pc.dim("Full model list: see `GET /models?job=image.generate` -- not hardcoded here, it drifts.")}
@@ -116,6 +118,7 @@ export default defineCommand({
       process.exit(2);
     }
     const prompt = flags.prompt; // narrowed non-null by the check above
+    const destinations = deliverFlagsOrExit(process.argv);
 
     const { client, cred, baseUrl } = await openSession();
     const isTTY = Boolean(process.stderr.isTTY);
@@ -149,7 +152,10 @@ export default defineCommand({
       });
 
       const job = await steps.step("Submitting", async () => {
-        return client.jobs.create({ type: "image.generate", params }, { signal: controller.signal });
+        return client.jobs.create(
+          { type: "image.generate", params, ...(destinations.length > 0 ? { destinations } : {}) },
+          { signal: controller.signal },
+        );
       });
 
       jobId = job.id;
@@ -209,7 +215,9 @@ export default defineCommand({
       }
       if (result.status === "cancelled") process.exit(130);
 
-      if (flags.json) { console.log(JSON.stringify(result)); process.exit(0); }
+      const exitCode = await finishDeliveries(steps, client, job.id, result, { signal: controller.signal, quiet: flags.quiet });
+
+      if (flags.json) { console.log(JSON.stringify(result)); process.exit(exitCode); }
 
       // ── 3. Resolve output ─────────────────────────────────
       const out = result.output;
@@ -219,13 +227,13 @@ export default defineCommand({
 
       if (flags.urlOnly) {
         if (url) console.log(url);
-        process.exit(0);
+        process.exit(exitCode);
       }
 
       if (!url) {
         // No file in output (unexpected) -- point at the dashboard.
         if (!flags.quiet && isTTY) process.stderr.write(`\n${dashboardLine}`);
-        process.exit(0);
+        process.exit(exitCode);
       }
 
       // Always print the URL -- pipeable, and the default way to get the result.
@@ -242,7 +250,7 @@ export default defineCommand({
       }
 
       if (!flags.quiet && isTTY) process.stderr.write(dashboardLine);
-      process.exit(0);
+      process.exit(exitCode);
 
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") process.exit(130);

@@ -3,6 +3,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import { parseFfmpegArgs } from "../lib/parse-ffmpeg-args.js";
+import { extractFfmpegArgs } from "../commands/ffmpeg.js";
 import { uploadLocalFiles } from "../lib/upload.js";
 
 describe("ffmpeg command flow", () => {
@@ -170,5 +171,17 @@ describe("ffmpeg --compute flag", () => {
     expect("compute" in params).toBe(false);
     expect(params.command).toBe("ffmpeg -i in.mp4 out.mp4");
     expect(params.timeout).toBe(120);
+  });
+});
+
+describe("--deliver is ours, not ffmpeg's", () => {
+  it("strips the flag and its value from the args sent to the runner", () => {
+    const saved = process.argv;
+    process.argv = ["bun", "rb", "ffmpeg", "-i", "in.mp4", "--deliver", "storage://prod-media/exports", "out.mp4"];
+    try {
+      expect(extractFfmpegArgs()).toEqual(["-i", "in.mp4", "out.mp4"]);
+    } finally {
+      process.argv = saved;
+    }
   });
 });
