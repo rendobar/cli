@@ -1,6 +1,7 @@
 import { describe, it, expect } from "bun:test";
-import { parseStorageTarget, formatConnections, formatListing, storageHint } from "../lib/storage-view.js";
+import { parseStorageTarget, formatConnections, formatListing, storageHint, connectionJson } from "../lib/storage-view.js";
 import { fmtBytes } from "../lib/progress.js";
+import type { StorageConnection } from "@rendobar/sdk";
 
 describe("parseStorageTarget", () => {
   it("accepts an id, an id with a folder, and the storage URI form", () => {
@@ -44,6 +45,43 @@ describe("formatListing", () => {
     expect(lines[1]).toContain(fmtBytes(18_400_000));
     expect(lines[1]).toContain(new Date(1_757_000_000_000).toISOString().slice(0, 10));
     expect(lines[1]).toContain("storage://prod-media/raw/clip.mp4");
+  });
+});
+
+describe("connectionJson", () => {
+  it("returns exactly the seven client-facing fields, with access and booleans normalized", () => {
+    const raw: StorageConnection = {
+      id: "prod-media",
+      provider: "s3",
+      bucket: "acme-prod-media",
+      region: "us-east-1",
+      endpoint: "https://s3.us-east-1.amazonaws.com",
+      pathStyle: false,
+      createdAt: 1_757_000_000_000,
+      updatedAt: 1_757_000_000_000,
+      access: "read",
+      accountId: "123456789012",
+      projectRef: "proj_abc123",
+      pathTemplate: "{date}/{source_name}.{ext}",
+      checks: [{ name: "read", status: "passed" }],
+      deliverySummary: {
+        jobsLast30d: 3,
+        bytesLast30d: 1_000,
+        lastAt: null,
+        lastStatus: null,
+        lastReason: null,
+      },
+      problem: { at: 1_757_000_000_000, message: "temporary outage" },
+    };
+    expect(connectionJson(raw)).toEqual({
+      id: "prod-media",
+      provider: "s3",
+      bucket: "acme-prod-media",
+      region: "us-east-1",
+      access: "read",
+      pending: false,
+      defaultDestination: false,
+    });
   });
 });
 

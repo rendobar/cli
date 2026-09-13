@@ -9,9 +9,21 @@ export interface ConnectionRow {
   id: string;
   provider: string;
   bucket: string;
+  region?: string;
   access?: "read";
   pending?: true;
   defaultDestination?: true;
+}
+
+/** The one connection shape every Rendobar client (n8n, Activepieces, MCP, CLI) returns. */
+export interface ConnectionJson {
+  id: string;
+  provider: string;
+  bucket: string;
+  region: string | null;
+  access: "read" | "deliver";
+  pending: boolean;
+  defaultDestination: boolean;
 }
 
 const PREFIX = "storage://";
@@ -24,6 +36,23 @@ export function parseStorageTarget(arg: string): { id: string; prefix: string } 
   if (id === "") return { error: "Name a connection, for example rb storage ls prod-media/raw/. Run rb storage list for the ids." };
   const rest = slash === -1 ? "" : bare.slice(slash + 1);
   return { id, prefix: rest === "" || rest.endsWith("/") ? rest : `${rest}/` };
+}
+
+/**
+ * `rb storage list --json` prints this, not the SDK's raw connection object,
+ * which carries fields (endpoint, accountId, projectRef, pathTemplate, pathStyle,
+ * checks, deliverySummary, problem) no other Rendobar client exposes.
+ */
+export function connectionJson(c: ConnectionRow): ConnectionJson {
+  return {
+    id: c.id,
+    provider: c.provider,
+    bucket: c.bucket,
+    region: c.region ?? null,
+    access: c.access === "read" ? "read" : "deliver",
+    pending: c.pending === true,
+    defaultDestination: c.defaultDestination === true,
+  };
 }
 
 export function formatConnections(rows: readonly ConnectionRow[]): string[] {

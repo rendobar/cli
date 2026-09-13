@@ -6,7 +6,7 @@ import { defineCommand } from "citty";
 import pc from "picocolors";
 import { isApiError, type StorageObject } from "@rendobar/sdk";
 import { openSession } from "../lib/session.js";
-import { formatConnections, formatListing, parseStorageTarget, storageHint } from "../lib/storage-view.js";
+import { connectionJson, formatConnections, formatListing, parseStorageTarget, storageHint } from "../lib/storage-view.js";
 
 function fail(code: 1 | 2, message: string): never {
   process.stderr.write(pc.red(`  ✗ ${message}\n`));
@@ -26,7 +26,7 @@ const list = defineCommand({
     try {
       const { data } = await client.storage.list();
       if (args.json) {
-        console.log(JSON.stringify(data));
+        console.log(JSON.stringify(data.map(connectionJson)));
         return;
       }
       for (const line of formatConnections(data)) console.log(line);
