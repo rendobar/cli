@@ -18,8 +18,8 @@
 import { defineCommand } from "citty";
 import pc from "picocolors";
 import { isApiError, jobData, WaitTimeoutError } from "@rendobar/sdk";
-import { createCliClient } from "../lib/client.js";
-import { resolveAuth, refreshTokenIfNeeded, getApiBaseUrl, getDashboardBaseUrl } from "../lib/auth.js";
+import { getDashboardBaseUrl } from "../lib/auth.js";
+import { openSession } from "../lib/session.js";
 import { shellEscape } from "../lib/shell-escape.js";
 import { isLocalPath, type ParsedInput } from "../lib/parse-ffmpeg-args.js";
 import { uploadLocalFiles } from "../lib/upload.js";
@@ -377,27 +377,7 @@ export default defineCommand({
 
     const isTTY = Boolean(process.stderr.isTTY);
 
-    let cred = resolveAuth();
-    if (!cred) {
-      process.stderr.write(pc.red("  ✗ Not authenticated. Run `rb login` or set RENDOBAR_API_KEY.\n"));
-      process.exit(2);
-    }
-
-    // Auto-refresh if OAuth and expired
-    if (cred.type === "oauth") {
-      try {
-        cred = await refreshTokenIfNeeded(cred);
-      } catch (err) {
-        process.stderr.write(pc.red(`  ✗ ${err instanceof Error ? err.message : "Auth error"}\n`));
-        process.exit(2);
-      }
-    }
-
-    const baseUrl = getApiBaseUrl();
-    const clientConfig = cred.type === "apikey"
-      ? { apiKey: cred.apiKey, baseUrl }
-      : { accessToken: cred.accessToken, baseUrl };
-    const client = createCliClient(clientConfig);
+    const { client, cred, baseUrl } = await openSession();
     const steps = new StepRenderer({ isTTY, quiet: flags.quiet });
 
     const controller = new AbortController();
