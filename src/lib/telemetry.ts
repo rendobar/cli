@@ -15,6 +15,7 @@
 // the cross-repo rule (the CLI can't import @rendobar/shared).
 
 import * as fs from "node:fs";
+import type { CommandDef, Resolvable, SubCommandsDef } from "citty";
 import { getConfigDir } from "./auth.js";
 import { VERSION, TELEMETRY_KEY } from "../generated/version.js";
 
@@ -170,4 +171,61 @@ export async function captureCommand(
   } catch {
     // Never let telemetry surface an error or delay the user.
   }
+}
+
+export type CaptureFn = (command: string, success: boolean, durationMs: number) => Promise<void>;
+
+async function resolveValue<T>(value: Resolvable<T>): Promise<T> {
+  // citty's own Resolvable<T> = T | Promise<T> | (() => T) | (() => Promise<T>).
+  // With T unconstrained, TS can't rule out T itself being function-shaped, so
+  // narrowing on `typeof value === "function"` alone leaves `T & Function` in
+  // the union. The `typeof` check is the actual runtime guarantee of safety
+  // here — this mirrors citty's own internal resolveValue (dist/index.mjs).
+  return typeof value === "function" ? await (value as () => T | Promise<T>)() : await value;
+}
+
+/**
+ * Recursively wrap every command's run() — including commands nested under
+ * `subCommands` — so each emits one anonymous `cli_command` event per
+ * invocation (command name, success, duration — never args or files). A
+ * nested command is named "parent child" (e.g. "storage list"), the same
+ * words citty's own usage line uses for it. Walks `subCommands` generically
+ * to any depth; nothing here is specific to any one command.
+ *
+ * Awaited in a finally so it flushes before the process exits; bounded +
+ * never throws, so it can't delay or break a command. `capture` defaults to
+ * `captureCommand` and exists so callers (tests) can inject a stand-in
+ * instead of hitting the network.
+ */
+export function instrumentCommands(
+  subs: SubCommandsDef,
+  prefix = "",
+  capture: CaptureFn = captureCommand,
+): SubCommandsDef {
+  const out: SubCommandsDef = {};
+  for (const [name, resolvable] of Object.entries(subs)) {
+    const fullName = prefix ? `${prefix} ${name}` : name;
+    out[name] = async () => {
+      const cmd: CommandDef = await resolveValue(resolvable);
+      const nestedSubs = cmd.subCommands ? await resolveValue(cmd.subCommands) : undefined;
+      const subCommands = nestedSubs ? instrumentCommands(nestedSubs, fullName, capture) : cmd.subCommands;
+      const origRun = cmd.run;
+      if (typeof origRun !== "function") return { ...cmd, subCommands };
+      const run: typeof origRun = async (ctx) => {
+        maybeShowFirstRunNotice();
+        const start = Date.now();
+        let ok = true;
+        try {
+          return await origRun(ctx);
+        } catch (err) {
+          ok = false;
+          throw err;
+        } finally {
+          await capture(fullName, ok, Date.now() - start);
+        }
+      };
+      return { ...cmd, run, subCommands };
+    };
+  }
+  return out;
 }
