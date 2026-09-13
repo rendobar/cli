@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { parseStorageTarget, formatConnections, formatListing, storageHint, storageExitCode, connectionJson } from "../lib/storage-view.js";
+import { parseStorageTarget, formatConnections, formatListing, storageHint, storageExitCode, connectionJson, encodeStoragePath } from "../lib/storage-view.js";
 import { fmtBytes } from "../lib/progress.js";
 import type { StorageConnection } from "@rendobar/sdk";
 
@@ -13,6 +13,25 @@ describe("parseStorageTarget", () => {
   it("refuses a target with no id", () => {
     expect(parseStorageTarget("storage:///raw")).toHaveProperty("error");
     expect(parseStorageTarget("")).toHaveProperty("error");
+  });
+
+  it("decodes a storage:// folder the platform's way, but leaves a typed path literal", () => {
+    expect(parseStorageTarget("storage://x/raw%23cut/")).toEqual({ id: "x", prefix: "raw#cut/" });
+    expect(parseStorageTarget("x/raw%23cut/")).toEqual({ id: "x", prefix: "raw%23cut/" });
+  });
+
+  it("falls back to the literal folder when a storage:// path is not valid percent-encoding", () => {
+    expect(parseStorageTarget("storage://x/50%.mp4")).toEqual({ id: "x", prefix: "50%.mp4/" });
+  });
+});
+
+describe("encodeStoragePath", () => {
+  it("escapes %, ? and # in that order, matching the platform's rule", () => {
+    expect(encodeStoragePath("a%b?c#d.mp4")).toBe("a%25b%3Fc%23d.mp4");
+  });
+
+  it("leaves a plain key unchanged", () => {
+    expect(encodeStoragePath("raw/clip 2026 (final).mp4")).toBe("raw/clip 2026 (final).mp4");
   });
 });
 
@@ -45,6 +64,15 @@ describe("formatListing", () => {
     expect(lines[1]).toContain(fmtBytes(18_400_000));
     expect(lines[1]).toContain(new Date(1_757_000_000_000).toISOString().slice(0, 10));
     expect(lines[1]).toContain("storage://prod-media/raw/clip.mp4");
+  });
+
+  it("encodes %, ? and # in the key so the printed URI round-trips", () => {
+    const lines = formatListing("prod-media", {
+      folders: ["raw#cut/"],
+      objects: [{ key: "clips/a%b?c#d.mp4", size: 1_000, lastModified: null }],
+    });
+    expect(lines[0]).toContain("storage://prod-media/raw%23cut/");
+    expect(lines[1]).toContain("storage://prod-media/clips/a%25b%3Fc%23d.mp4");
   });
 });
 
