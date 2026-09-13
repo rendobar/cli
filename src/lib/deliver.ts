@@ -52,18 +52,31 @@ const PREFIX = "storage://";
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 const isStatus = (v: unknown): v is Delivery["status"] => v === "pending" || v === "delivered" || v === "failed";
 
-/** Every `--deliver <uri>` on the command line, in order, and what was wrong with any of them. */
+const EQUALS_PREFIX = "--deliver=";
+
+/** Every `--deliver <uri>` or `--deliver=<uri>` on the command line, in order, and what was wrong with any of them. */
 export function readDeliverFlags(argv: readonly string[]): { destinations: string[]; errors: string[] } {
   const destinations: string[] = [];
   const errors: string[] = [];
   for (let i = 0; i < argv.length; i++) {
-    if (argv[i] !== "--deliver") continue;
-    const value = argv[i + 1];
-    if (value === undefined || value.startsWith("--")) {
-      errors.push("--deliver needs a destination, for example --deliver storage://prod-media");
+    const arg = argv[i]!;
+    let value: string | undefined;
+    if (arg === "--deliver") {
+      value = argv[i + 1];
+      if (value === undefined || value.startsWith("--")) {
+        errors.push("--deliver needs a destination, for example --deliver storage://prod-media");
+        continue;
+      }
+      i++;
+    } else if (arg.startsWith(EQUALS_PREFIX)) {
+      value = arg.slice(EQUALS_PREFIX.length);
+      if (value === "") {
+        errors.push("--deliver needs a destination, for example --deliver storage://prod-media");
+        continue;
+      }
+    } else {
       continue;
     }
-    i++;
     const id = value.startsWith(PREFIX) ? (value.slice(PREFIX.length).split("/")[0] ?? "") : "";
     if (id === "") {
       errors.push(`--deliver takes storage://<id>[/<folder or path>], not "${value}". Run rb storage list for the ids.`);

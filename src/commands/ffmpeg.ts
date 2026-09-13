@@ -129,6 +129,7 @@ export function extractFfmpegArgs(): string[] {
     const arg = argv[i]!;
     if (globalFlags.has(arg)) continue;
     if (globalFlagsWithValue.has(arg)) { i++; continue; }
+    if (arg.startsWith("--deliver=")) continue;
     result.push(arg);
   }
   return result;

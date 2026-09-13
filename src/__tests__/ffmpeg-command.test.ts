@@ -184,4 +184,14 @@ describe("--deliver is ours, not ffmpeg's", () => {
       process.argv = saved;
     }
   });
+
+  it("strips the --deliver=value form too", () => {
+    const saved = process.argv;
+    process.argv = ["bun", "rb", "ffmpeg", "-i", "in.mp4", "--deliver=storage://a", "out.mp4"];
+    try {
+      expect(extractFfmpegArgs()).toEqual(["-i", "in.mp4", "out.mp4"]);
+    } finally {
+      process.argv = saved;
+    }
+  });
 });

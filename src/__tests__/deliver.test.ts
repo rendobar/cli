@@ -34,6 +34,18 @@ describe("readDeliverFlags", () => {
   it("refuses storage:// with no id", () => {
     expect(readDeliverFlags(["--deliver", "storage:///exports"]).errors).toHaveLength(1);
   });
+
+  it("accepts the --deliver=value form", () => {
+    expect(readDeliverFlags(["--deliver=storage://a/b"])).toEqual({ destinations: ["storage://a/b"], errors: [] });
+  });
+
+  it("refuses a bad --deliver=value the same way as the two-argument form", () => {
+    const empty = readDeliverFlags(["--deliver="]);
+    expect(empty.errors).toHaveLength(1);
+    const notStorage = readDeliverFlags(["--deliver=s3://bucket/key"]);
+    expect(notStorage.destinations).toEqual([]);
+    expect(notStorage.errors[0]).toContain("storage://<id>");
+  });
 });
 
 describe("parseDeliveries", () => {
