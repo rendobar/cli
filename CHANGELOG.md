@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.13.1](https://github.com/rendobar/cli/compare/v1.13.0...v1.13.1) (2026-09-13)
+
+
+### Bug Fixes
+
+* count rb storage list and ls in usage telemetry ([ab53e46](https://github.com/rendobar/cli/commit/ab53e46442d7df0b662ae9dc3fd7940e3e490873))
+* encode %, ? and # in rb storage URIs ([ab53e46](https://github.com/rendobar/cli/commit/ab53e46442d7df0b662ae9dc3fd7940e3e490873))
+
 ## [1.13.0](https://github.com/rendobar/cli/compare/v1.12.4...v1.13.0) (2026-09-13)
 
 
