@@ -32,13 +32,31 @@ export interface ConnectionJson {
 
 const PREFIX = "storage://";
 
+// Escapes %, ? and # in that order, matching encodeStoragePath in rendobar/rendobar#696 (packages/shared/src/storage/refs.ts).
+export function encodeStoragePath(path: string): string {
+  return path.replace(/[%?#]/g, (c) => encodeURIComponent(c));
+}
+
+// Mirrors decodeStoragePath in rendobar/rendobar#696: falls back to the literal text when it is not valid percent-encoding.
+function decodeStoragePath(path: string): string {
+  try {
+    return decodeURIComponent(path);
+  } catch {
+    return path;
+  }
+}
+
 /** `<id>`, `<id>/<folder>` or `storage://<id>/<folder>`, as the id and a folder prefix ending in "/". */
 export function parseStorageTarget(arg: string): { id: string; prefix: string } | { error: string } {
-  const bare = arg.startsWith(PREFIX) ? arg.slice(PREFIX.length) : arg;
+  const isUri = arg.startsWith(PREFIX);
+  const bare = isUri ? arg.slice(PREFIX.length) : arg;
   const slash = bare.indexOf("/");
   const id = slash === -1 ? bare : bare.slice(0, slash);
   if (id === "") return { error: "Name a connection, for example rb storage ls prod-media/raw/. Run rb storage list for the ids." };
-  const rest = slash === -1 ? "" : bare.slice(slash + 1);
+  const rawRest = slash === -1 ? "" : bare.slice(slash + 1);
+  // A storage:// URI was copied from `rb storage ls` output, so it is decoded. A bare
+  // <id>/<folder> was typed by hand, so it stays literal.
+  const rest = isUri ? decodeStoragePath(rawRest) : rawRest;
   return { id, prefix: rest === "" || rest.endsWith("/") ? rest : `${rest}/` };
 }
 
@@ -76,10 +94,10 @@ export function formatConnections(rows: readonly ConnectionRow[]): string[] {
 
 export function formatListing(id: string, page: { folders: readonly string[]; objects: readonly StorageObject[] }): string[] {
   const blank = `${"".padStart(9)}  ${"".padEnd(10)}`;
-  const lines = page.folders.map((folder) => `${blank}  ${PREFIX}${id}/${folder}`);
+  const lines = page.folders.map((folder) => `${blank}  ${PREFIX}${id}/${encodeStoragePath(folder)}`);
   for (const o of page.objects) {
     const date = o.lastModified === null ? "" : new Date(o.lastModified).toISOString().slice(0, 10);
-    lines.push(`${fmtBytes(o.size).padStart(9)}  ${date.padEnd(10)}  ${PREFIX}${id}/${o.key}`);
+    lines.push(`${fmtBytes(o.size).padStart(9)}  ${date.padEnd(10)}  ${PREFIX}${id}/${encodeStoragePath(o.key)}`);
   }
   return lines;
 }
