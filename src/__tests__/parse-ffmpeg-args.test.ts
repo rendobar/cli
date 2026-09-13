@@ -14,6 +14,11 @@ describe("parseFfmpegArgs", () => {
     expect(result.inputs[0]!.isLocal).toBe(true);
   });
 
+  it("treats storage:// and asset:// references as remote, not local files", () => {
+    const result = parseFfmpegArgs(["-i", "storage://demo-bucket/raw/clip.mp4", "-i", "asset://asset_abc123", "output.mp4"]);
+    expect(result.inputs.map((i) => i.isLocal)).toEqual([false, false]);
+  });
+
   it("handles multiple inputs", () => {
     const result = parseFfmpegArgs(["-i", "./video.mp4", "-i", "./audio.mp3", "output.mp4"]);
     expect(result.inputs).toHaveLength(2);
