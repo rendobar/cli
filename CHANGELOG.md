@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.4](https://github.com/rendobar/cli/compare/v1.12.3...v1.12.4) (2026-09-13)
+
+
+### Bug Fixes
+
+* treat storage:// and asset:// inputs as remote, not local files ([#156](https://github.com/rendobar/cli/issues/156)) ([5770a3d](https://github.com/rendobar/cli/commit/5770a3d8075fa6cc29fc328a88745c36ea22d52a))
+
 ## [1.12.3](https://github.com/rendobar/cli/compare/v1.12.2...v1.12.3) (2026-09-01)
 
 
