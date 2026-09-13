@@ -377,7 +377,7 @@ export default defineCommand({
 
     const isTTY = Boolean(process.stderr.isTTY);
 
-    const { client, cred, baseUrl } = await openSession();
+    const { client } = await openSession();
     const steps = new StepRenderer({ isTTY, quiet: flags.quiet });
 
     const controller = new AbortController();

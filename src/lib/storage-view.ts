@@ -3,6 +3,7 @@
  * takes data the command already has and returns lines or a parsed value.
  */
 import type { StorageObject } from "@rendobar/sdk";
+import { getDashboardBaseUrl } from "./auth.js";
 import { fmtBytes } from "./progress.js";
 
 export interface ConnectionRow {
@@ -15,7 +16,10 @@ export interface ConnectionRow {
   defaultDestination?: true;
 }
 
-/** The one connection shape every Rendobar client (n8n, Activepieces, MCP, CLI) returns. */
+/**
+ * The one connection shape n8n, Activepieces, the local MCP server and the CLI
+ * return. The hosted MCP server returns more fields than this.
+ */
 export interface ConnectionJson {
   id: string;
   provider: string;
@@ -41,7 +45,8 @@ export function parseStorageTarget(arg: string): { id: string; prefix: string } 
 /**
  * `rb storage list --json` prints this, not the SDK's raw connection object,
  * which carries fields (endpoint, accountId, projectRef, pathTemplate, pathStyle,
- * checks, deliverySummary, problem) no other Rendobar client exposes.
+ * checks, deliverySummary, problem) that n8n, Activepieces, the local MCP server
+ * and the CLI all leave out. The hosted MCP server exposes more of them.
  */
 export function connectionJson(c: ConnectionRow): ConnectionJson {
   return {
@@ -56,7 +61,7 @@ export function connectionJson(c: ConnectionRow): ConnectionJson {
 }
 
 export function formatConnections(rows: readonly ConnectionRow[]): string[] {
-  if (rows.length === 0) return ["No storage connected. Connect a bucket at https://app.rendobar.com/storage"];
+  if (rows.length === 0) return [`No storage connected. Connect a bucket at ${getDashboardBaseUrl()}/storage`];
   const head = ["ID", "PROVIDER", "BUCKET", "ACCESS", ""];
   const body = rows.map((r) => [
     r.id,
@@ -82,5 +87,10 @@ export function formatListing(id: string, page: { folders: readonly string[]; ob
 /** Credentials from before connected storage carry no storage scope. Say how to get one. */
 export function storageHint(code: string, message: string): string {
   if (code !== "INSUFFICIENT_SCOPE") return message;
-  return `${message} Run rb login again to grant storage access, or use an API key created after September 13, 2026.`;
+  return `${message} A sign-in or API key made before September 13, 2026 does not have storage access. Run rb login again, or make a new API key.`;
+}
+
+/** A bad token and a missing storage scope are both authorization problems, so both exit 2. */
+export function storageExitCode(statusCode: number, code: string): 1 | 2 {
+  return statusCode === 401 || code === "INSUFFICIENT_SCOPE" ? 2 : 1;
 }

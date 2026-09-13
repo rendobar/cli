@@ -6,7 +6,7 @@ import { defineCommand } from "citty";
 import pc from "picocolors";
 import { isApiError, type StorageObject } from "@rendobar/sdk";
 import { openSession } from "../lib/session.js";
-import { connectionJson, formatConnections, formatListing, parseStorageTarget, storageHint } from "../lib/storage-view.js";
+import { connectionJson, formatConnections, formatListing, parseStorageTarget, storageExitCode, storageHint } from "../lib/storage-view.js";
 
 function fail(code: 1 | 2, message: string): never {
   process.stderr.write(pc.red(`  ✗ ${message}\n`));
@@ -14,7 +14,7 @@ function fail(code: 1 | 2, message: string): never {
 }
 
 function failRequest(err: unknown): never {
-  if (isApiError(err)) fail(err.statusCode === 401 ? 2 : 1, storageHint(err.code, err.message));
+  if (isApiError(err)) fail(storageExitCode(err.statusCode, err.code), storageHint(err.code, err.message));
   fail(1, err instanceof Error ? err.message : "Request failed");
 }
 

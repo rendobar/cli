@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { parseStorageTarget, formatConnections, formatListing, storageHint, connectionJson } from "../lib/storage-view.js";
+import { parseStorageTarget, formatConnections, formatListing, storageHint, storageExitCode, connectionJson } from "../lib/storage-view.js";
 import { fmtBytes } from "../lib/progress.js";
 import type { StorageConnection } from "@rendobar/sdk";
 
@@ -90,7 +90,23 @@ describe("storageHint", () => {
     expect(storageHint("INSUFFICIENT_SCOPE", "This endpoint requires the storage:read scope.")).toContain("rb login");
   });
 
+  it("names the date a credential without storage access predates", () => {
+    expect(storageHint("INSUFFICIENT_SCOPE", "This endpoint requires the storage:read scope.")).toContain("made before September 13, 2026");
+  });
+
   it("leaves other messages alone", () => {
     expect(storageHint("NOT_FOUND", 'Storage "x" not found.')).toBe('Storage "x" not found.');
+  });
+});
+
+describe("storageExitCode", () => {
+  it("exits 2 for a bad token or a missing storage scope, like any auth problem", () => {
+    expect(storageExitCode(401, "UNAUTHORIZED")).toBe(2);
+    expect(storageExitCode(403, "INSUFFICIENT_SCOPE")).toBe(2);
+  });
+
+  it("exits 1 for any other API error", () => {
+    expect(storageExitCode(404, "NOT_FOUND")).toBe(1);
+    expect(storageExitCode(400, "VALIDATION_ERROR")).toBe(1);
   });
 });
