@@ -3,35 +3,15 @@
  */
 import { defineCommand } from "citty";
 import pc from "picocolors";
-import { createCliClient } from "../lib/client.js";
-import { resolveAuth, refreshTokenIfNeeded, getApiBaseUrl, saveApiKey, saveOAuthCredentials } from "../lib/auth.js";
+import { saveApiKey, saveOAuthCredentials } from "../lib/auth.js";
+import { openSession } from "../lib/session.js";
 
 export default defineCommand({
   meta: { name: "whoami", description: "Show current authenticated identity" },
   async run() {
-    let cred = resolveAuth();
-    if (!cred) {
-      process.stderr.write(pc.red("  ✗ Not authenticated. Run `rb login` or set RENDOBAR_API_KEY.\n"));
-      process.exit(2);
-    }
-
-    // Auto-refresh if OAuth and expired
-    if (cred.type === "oauth") {
-      try {
-        cred = await refreshTokenIfNeeded(cred);
-      } catch (err) {
-        process.stderr.write(pc.red(`  ✗ ${err instanceof Error ? err.message : "Auth error"}\n`));
-        process.exit(2);
-      }
-    }
-
-    const baseUrl = getApiBaseUrl();
-    const clientConfig = cred.type === "apikey"
-      ? { apiKey: cred.apiKey, baseUrl }
-      : { accessToken: cred.accessToken, baseUrl };
+    const { client, cred, baseUrl } = await openSession();
 
     try {
-      const client = createCliClient(clientConfig);
       const state = await client.orgs.current();
 
       process.stderr.write(`  ${pc.dim("Org")}       ${pc.bold(state.org.name)}\n`);

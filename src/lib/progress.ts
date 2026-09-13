@@ -11,6 +11,7 @@ import * as path from "node:path";
 import * as fs from "node:fs/promises";
 import pc from "picocolors";
 import type { RendobarClient } from "@rendobar/sdk";
+import { parseDeliveries, type Delivery } from "./deliver.js";
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -29,6 +30,8 @@ export interface ProgressResult {
   /** Started → Completed (actual execution) */
   execMs: number;
   machine?: MachineContext;
+  /** Storage deliveries, one per destination. Empty when the job named none. */
+  deliveries: Delivery[];
 }
 
 export interface MachineContext {
@@ -269,6 +272,7 @@ export function buildResult(status: string, machine: MachineContext | undefined,
     queueMs,
     execMs,
     machine,
+    deliveries: parseDeliveries(job),
   };
 }
 

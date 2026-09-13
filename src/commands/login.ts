@@ -205,8 +205,9 @@ export default defineCommand({
       // the scope vocabulary and now expands to nothing, so requesting it still
       // completed the flow and returned a token carrying zero scopes: login
       // reported success and every call after it answered 403.
+      // storage:read is for rb storage. It must stay in step with the scopes in cli-oauth-client.sql.
       scope:
-        "openid offline_access jobs:write assets:write webhooks:write billing:read orgs:read",
+        "openid offline_access jobs:write assets:write webhooks:write billing:read orgs:read storage:read",
       code_challenge: codeChallenge,
       code_challenge_method: "S256",
       state,

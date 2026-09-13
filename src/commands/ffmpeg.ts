@@ -9,8 +9,9 @@ import { defineCommand } from "citty";
 import * as path from "node:path";
 import pc from "picocolors";
 import { isApiError } from "@rendobar/sdk";
-import { createCliClient } from "../lib/client.js";
-import { resolveAuth, refreshTokenIfNeeded, getApiBaseUrl, getDashboardBaseUrl } from "../lib/auth.js";
+import { getDashboardBaseUrl } from "../lib/auth.js";
+import { openSession } from "../lib/session.js";
+import { deliverFlagsOrExit, finishDeliveries } from "../lib/deliver.js";
 import { parseFfmpegArgs } from "../lib/parse-ffmpeg-args.js";
 import { shellEscape } from "../lib/shell-escape.js";
 import { uploadLocalFiles } from "../lib/upload.js";
@@ -117,17 +118,18 @@ function extractGlobalFlags(): GlobalFlags {
   return flags;
 }
 
-function extractFfmpegArgs(): string[] {
+export function extractFfmpegArgs(): string[] {
   const argv = process.argv;
   const ffmpegIdx = argv.indexOf("ffmpeg");
   if (ffmpegIdx === -1) return [];
   const globalFlags = new Set(["--json", "--url-only", "--quiet", "--no-wait", "--no-download"]);
-  const globalFlagsWithValue = new Set(["--timeout", "--output", "--output-dir", "--compute"]);
+  const globalFlagsWithValue = new Set(["--timeout", "--output", "--output-dir", "--compute", "--deliver"]);
   const result: string[] = [];
   for (let i = ffmpegIdx + 1; i < argv.length; i++) {
     const arg = argv[i]!;
     if (globalFlags.has(arg)) continue;
     if (globalFlagsWithValue.has(arg)) { i++; continue; }
+    if (arg.startsWith("--deliver=")) continue;
     result.push(arg);
   }
   return result;
@@ -154,6 +156,7 @@ ${pc.bold("Flags:")}
   --no-wait           Submit and exit immediately (prints job ID)
   --timeout N         Max execution time in seconds (default: 120, max: 900)
   --compute <mode>    Run on cpu or gpu hardware (auto, cpu, gpu; gpu needs Pro)
+  --deliver <uri>     Also write the output to connected storage, e.g. storage://prod-media/exports (repeatable)
 
 ${pc.dim("Outputs download to your folder by default — like running ffmpeg locally.")}
 ${pc.dim("Local files are auto-uploaded before job submission.")}
@@ -176,28 +179,9 @@ export default defineCommand({
       for (const err of parsed.errors) process.stderr.write(pc.red(`  ✗ ${err}\n`));
       process.exit(2);
     }
+    const destinations = deliverFlagsOrExit(process.argv);
 
-    let cred = resolveAuth();
-    if (!cred) {
-      process.stderr.write(pc.red("  ✗ Not authenticated. Run `rb login` or set RENDOBAR_API_KEY.\n"));
-      process.exit(2);
-    }
-
-    // Auto-refresh if OAuth and expired
-    if (cred.type === "oauth") {
-      try {
-        cred = await refreshTokenIfNeeded(cred);
-      } catch (err) {
-        process.stderr.write(pc.red(`  ✗ ${err instanceof Error ? err.message : "Auth error"}\n`));
-        process.exit(2);
-      }
-    }
-
-    const baseUrl = getApiBaseUrl();
-    const clientConfig = cred.type === "apikey"
-      ? { apiKey: cred.apiKey, baseUrl }
-      : { accessToken: cred.accessToken, baseUrl };
-    const client = createCliClient(clientConfig);
+    const { client, cred, baseUrl } = await openSession();
     const steps = new StepRenderer({ isTTY, quiet: flags.quiet });
 
     const controller = new AbortController();
@@ -246,6 +230,7 @@ export default defineCommand({
           {
             type: "ffmpeg",
             params: { command, timeout: flags.timeout, ...(flags.compute ? { compute: flags.compute } : {}) },
+            ...(destinations.length > 0 ? { destinations } : {}),
           },
           { signal: controller.signal },
         );
@@ -324,13 +309,23 @@ export default defineCommand({
       }
       if (result.status === "cancelled") process.exit(130);
 
+      // The job is already complete, so Ctrl+C from here on has nothing to
+      // cancel. Clearing jobId keeps the SIGINT handler from posting a
+      // cancel for a job that already finished.
+      jobId = undefined;
+      const exitCode = await finishDeliveries(steps, client, job.id, result, {
+        signal: controller.signal,
+        quiet: flags.quiet,
+        requested: destinations.length > 0,
+      });
+
       // ── Output modes ─────────────────────────────────────
-      if (flags.json) { console.log(JSON.stringify(result)); process.exit(0); }
+      if (flags.json) { console.log(JSON.stringify(result)); process.exit(exitCode); }
       if (flags.urlOnly) {
         // headline file url (single file or stream manifest); first file for a set.
         const url = result.output ? outputUrl(result.output) : undefined;
         if (url) console.log(url);
-        process.exit(0);
+        process.exit(exitCode);
       }
 
       // ── 4. Download outputs locally (like a local tool) ──
@@ -360,13 +355,13 @@ export default defineCommand({
           }
           process.stderr.write(dashboardLine);
         }
-        process.exit(0);
+        process.exit(exitCode);
       }
 
       if (!out) {
         // No output object (unexpected) — just point at the dashboard.
         if (!flags.quiet && isTTY) process.stderr.write(`\n${dashboardLine}`);
-        process.exit(0);
+        process.exit(exitCode);
       }
 
       if (file && !isStream && out.files.length <= 1) {
@@ -423,7 +418,7 @@ export default defineCommand({
         process.stderr.write(`\n${dashboardLine}`);
       }
 
-      process.exit(0);
+      process.exit(exitCode);
 
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") process.exit(130);
