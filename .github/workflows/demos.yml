@@ -21,7 +21,7 @@ permissions:
 jobs:
   render:
     name: render demos
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     container:
       image: ghcr.io/charmbracelet/vhs:v0.12.0@sha256:b1afb4f9d0d27000d5feb7e93882dc5b983574fc19462308ee1d94e843afc67d
       options: --user root
