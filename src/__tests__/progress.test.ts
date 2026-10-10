@@ -14,6 +14,7 @@ describe("buildResult — unified output", () => {
           path: "output.mp4",
           type: "video",
           size: 4096,
+          sha256: "6d4e00f20563d9c06310b5d44777796b5d4a6ca60fbc86f6349a6ef1d6718995",
           meta: { format: "mp4", width: 1280, height: 720 },
         },
         files: [
@@ -29,6 +30,10 @@ describe("buildResult — unified output", () => {
       },
     });
     expect(r.output?.data).toBeNull();
+    // The checksum is kept when the API sends one, and reads as null when the
+    // key is missing (an entry from an API older than the field).
+    expect(r.output?.file?.sha256).toBe("6d4e00f20563d9c06310b5d44777796b5d4a6ca60fbc86f6349a6ef1d6718995");
+    expect(r.output?.files[0]?.sha256).toBeNull();
     expect(r.output?.file?.url).toBe("https://cdn.rendobar.com/jobs/job_1/output.mp4");
     expect(r.output?.file?.type).toBe("video");
     expect(r.output?.file?.meta?.width).toBe(1280);
@@ -137,8 +142,8 @@ describe("outputUrl", () => {
     expect(
       outputUrl({
         data: null,
-        file: { url: "https://cdn.rendobar.com/jobs/job_1/output.mp4", path: "output.mp4", type: "video", size: 1 },
-        files: [{ url: "https://cdn.rendobar.com/jobs/job_1/output.mp4", path: "output.mp4", type: "video", size: 1 }],
+        file: { url: "https://cdn.rendobar.com/jobs/job_1/output.mp4", path: "output.mp4", type: "video", size: 1, sha256: null },
+        files: [{ url: "https://cdn.rendobar.com/jobs/job_1/output.mp4", path: "output.mp4", type: "video", size: 1, sha256: null }],
         expiresAt: null,
       }),
     ).toBe("https://cdn.rendobar.com/jobs/job_1/output.mp4");
@@ -148,8 +153,8 @@ describe("outputUrl", () => {
     expect(
       outputUrl({
         data: null,
-        file: { url: "https://api.rendobar.com/v/job_1/tok/master.m3u8", path: "master.m3u8", type: "playlist", size: 1 },
-        files: [{ url: "https://api.rendobar.com/v/job_1/tok/seg0.ts", path: "seg0.ts", type: "video", size: 1 }],
+        file: { url: "https://api.rendobar.com/v/job_1/tok/master.m3u8", path: "master.m3u8", type: "playlist", size: 1, sha256: null },
+        files: [{ url: "https://api.rendobar.com/v/job_1/tok/seg0.ts", path: "seg0.ts", type: "video", size: 1, sha256: null }],
         expiresAt: null,
       }),
     ).toBe("https://api.rendobar.com/v/job_1/tok/master.m3u8");
@@ -161,8 +166,8 @@ describe("outputUrl", () => {
         data: null,
         file: null,
         files: [
-          { url: "https://api.rendobar.com/v/job_2/tok/a.png", path: "a.png", type: "image", size: 1 },
-          { url: "https://api.rendobar.com/v/job_2/tok/b.png", path: "b.png", type: "image", size: 1 },
+          { url: "https://api.rendobar.com/v/job_2/tok/a.png", path: "a.png", type: "image", size: 1, sha256: null },
+          { url: "https://api.rendobar.com/v/job_2/tok/b.png", path: "b.png", type: "image", size: 1, sha256: null },
         ],
         expiresAt: null,
       }),
@@ -237,8 +242,8 @@ describe("downloadFilesToDir — set/stream into a local folder", () => {
   it("downloads every file of a set, preserving each path", async () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "rb-set-"));
     const files: JobFile[] = [
-      { url: "https://signed.example/a.png", path: "a.png", type: "image", size: 1 },
-      { url: "https://signed.example/b.png", path: "b.png", type: "image", size: 1 },
+      { url: "https://signed.example/a.png", path: "a.png", type: "image", size: 1, sha256: null },
+      { url: "https://signed.example/b.png", path: "b.png", type: "image", size: 1, sha256: null },
     ];
     mockBody({ "https://signed.example/a.png": "A", "https://signed.example/b.png": "B" });
 
@@ -252,7 +257,7 @@ describe("downloadFilesToDir — set/stream into a local folder", () => {
   it("downloads a stream manifest + segments so it plays locally", async () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "rb-hls-"));
     const files: JobFile[] = [
-      { url: "https://signed.example/master.m3u8", path: "master.m3u8", type: "playlist", size: 1 },
+      { url: "https://signed.example/master.m3u8", path: "master.m3u8", type: "playlist", size: 1, sha256: null },
       { url: "https://signed.example/seg0.ts", path: "seg0.ts", type: "video", size: 1 },
       { url: "https://signed.example/seg1.ts", path: "seg1.ts", type: "video", size: 1 },
     ];

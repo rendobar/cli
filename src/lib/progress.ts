@@ -65,6 +65,8 @@ export interface JobFile {
   path: string;
   type: "video" | "image" | "audio" | "captions" | "playlist" | "data" | "other";
   size: number;
+  /** SHA-256 of the file as lowercase hex, null when the API has none. */
+  sha256: string | null;
   meta?: {
     format?: string;
     width?: number;
@@ -307,6 +309,8 @@ function parseFile(raw: unknown): JobFile | undefined {
     path: typeof f.path === "string" ? f.path : "",
     type,
     size: optNumber(f.size) ?? 0,
+    // An API older than the field sends no key: read that as null too.
+    sha256: optString(f.sha256) ?? null,
     meta: meta
       ? {
           format: optString(meta.format),
