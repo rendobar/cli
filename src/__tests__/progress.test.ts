@@ -258,8 +258,8 @@ describe("downloadFilesToDir — set/stream into a local folder", () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "rb-hls-"));
     const files: JobFile[] = [
       { url: "https://signed.example/master.m3u8", path: "master.m3u8", type: "playlist", size: 1, sha256: null },
-      { url: "https://signed.example/seg0.ts", path: "seg0.ts", type: "video", size: 1 },
-      { url: "https://signed.example/seg1.ts", path: "seg1.ts", type: "video", size: 1 },
+      { url: "https://signed.example/seg0.ts", path: "seg0.ts", type: "video", size: 1, sha256: null },
+      { url: "https://signed.example/seg1.ts", path: "seg1.ts", type: "video", size: 1, sha256: null },
     ];
     mockBody({
       "https://signed.example/master.m3u8": "#EXTM3U",
@@ -278,7 +278,7 @@ describe("downloadFilesToDir — set/stream into a local folder", () => {
   it("preserves nested relative paths and creates subdirs", async () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "rb-nested-"));
     const files: JobFile[] = [
-      { url: "https://signed.example/v/720p/seg0.ts", path: "720p/seg0.ts", type: "video", size: 1 },
+      { url: "https://signed.example/v/720p/seg0.ts", path: "720p/seg0.ts", type: "video", size: 1, sha256: null },
     ];
     mockBody({ "https://signed.example/v/720p/seg0.ts": "NESTED" });
 
@@ -291,7 +291,7 @@ describe("downloadFilesToDir — set/stream into a local folder", () => {
   it("falls back to the url basename when a file has no path", async () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "rb-nopath-"));
     const files: JobFile[] = [
-      { url: "https://signed.example/cdn/frame_001.png", path: "", type: "image", size: 1 },
+      { url: "https://signed.example/cdn/frame_001.png", path: "", type: "image", size: 1, sha256: null },
     ];
     mockBody({ "https://signed.example/cdn/frame_001.png": "PNG" });
 
