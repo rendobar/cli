@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.14.0](https://github.com/rendobar/cli/compare/v1.13.1...v1.14.0) (2026-10-10)
+
+
+### Features
+
+* keep output.file.sha256 in job results ([#174](https://github.com/rendobar/cli/issues/174)) ([cd01e8d](https://github.com/rendobar/cli/commit/cd01e8d72cd4c03ca44629b309a54da7a40b614b))
+
 ## [1.13.1](https://github.com/rendobar/cli/compare/v1.13.0...v1.13.1) (2026-09-13)
 
 
