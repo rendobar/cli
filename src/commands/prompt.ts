@@ -32,10 +32,19 @@ Live sources of truth:
 - Capability map: https://rendobar.com/llms.txt
 - Docs text for AI: https://rendobar.com/docs/llms-full.txt (human docs at https://rendobar.com/docs)
 - Error reference: https://rendobar.com/docs/support/errors
+- Plan limits (file size, timeouts, concurrency): https://rendobar.com/docs/support/limits
+- What changed lately: https://rendobar.com/changelog/feed.json (JSON Feed, newest first). New job types, new parameters and behavior changes land here, most of them after your training data.
+- Each job type has its own docs page under https://rendobar.com/docs/jobs/. Compose effects and transitions are shown rendered, with the exact request, at https://rendobar.com/compose/effects/
 
 API key rules, follow exactly:
 - I created an API key in the Rendobar dashboard. Ask me to put it in this project's env as RENDOBAR_API_KEY, in a gitignored env file, and wait for my confirmation before running anything that calls the API.
 - Never ask me to paste the key into this chat. Never print, log, or commit it. Never put it in client-side code.
+
+Stay current, every time:
+- Before writing code, read the newest changelog entries and the live schema of every job type you use. Trust them over your memory and over older code in this project.
+- Install the latest @rendobar/sdk (check with npm view @rendobar/sdk version). Never pin a version from memory.
+- If a parameter, field or error code is missing, renamed or new, re-read the schema and the changelog before guessing.
+- Compose timelines: check each one with POST https://api.rendobar.com/compose/validate before submitting.
 
 Step 0, detect the stack before writing code:
 - Inspect the project (package.json, requirements.txt, go.mod, composer.json, Gemfile). JavaScript or TypeScript: use the official SDK, @rendobar/sdk. Anything else: call the REST API directly using the OpenAPI spec above. Same endpoints, same shapes.
@@ -56,6 +65,8 @@ Hard rules:
 - When something is ambiguous, choose the smallest default that keeps the app compiling and tell me what you chose. Ask me only when it is a product decision.
 
 If I am talking to you inside an MCP-capable client (Claude, Cursor, and others), also offer to connect Rendobar's MCP server for running jobs in conversation: https://api.rendobar.com/mcp over OAuth, or npx -y @rendobar/mcp with the key read from env. That is separate from the codebase integration above.
+
+For later work in this project, offer to install Rendobar's agent skills so future sessions start from current Rendobar knowledge: npx skills add rendobar/agent-skills (in Claude Code: /plugin marketplace add rendobar/agent-skills).
 `;
 
 /**
