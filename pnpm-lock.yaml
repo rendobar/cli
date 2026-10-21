@@ -171,7 +171,7 @@ importers:
         version: 1.8.1
       '@rendobar/sdk':
         specifier: ^5.11.0
-        version: 5.13.1
+        version: 5.14.0
       citty:
         specifier: ^0.2.0
         version: 0.2.2
@@ -298,8 +298,8 @@ packages:
     resolution: {integrity: sha512-GsCw/qu92GI0EX6s7fxUi/SG1lmFjG9XZivxxEDZXqztuQKCn5o5wKdz4v005zci0Md7EZzgAwmQLoIEDZoaow==}
     engines: {node: '>=22'}
 
-  '@rendobar/sdk@5.13.1':
-    resolution: {integrity: sha512-xAfBvtZCrTax1E9WdSjP4SV+Ddl/xeq3fOyqpz5r+RPIuQ/nvZKhUU5MBDBX1s+QurWAiORiMqCNQV8SSiUfHg==}
+  '@rendobar/sdk@5.14.0':
+    resolution: {integrity: sha512-H0c+S/lkTE+BdeWVL21MmxCAylhfS9+IuOu1ESYb7PvRDa7WGzEJd3rBvi0gN/LXK0fPKqGuDAdOelZsBytQnQ==}
     engines: {node: '>=18'}
 
   '@simple-libs/child-process-utils@2.0.0':
@@ -849,7 +849,7 @@ snapshots:
 
   '@conventional-changelog/template@1.3.0': {}
 
-  '@rendobar/sdk@5.13.1':
+  '@rendobar/sdk@5.14.0':
     dependencies:
       partysocket: 1.3.0
     transitivePeerDependencies:
