@@ -171,7 +171,7 @@ importers:
         version: 1.8.1
       '@rendobar/sdk':
         specifier: ^5.11.0
-        version: 5.14.0
+        version: 5.15.0
       citty:
         specifier: ^0.2.0
         version: 0.2.2
@@ -187,7 +187,7 @@ importers:
         version: 21.2.4
       '@types/bun':
         specifier: latest
-        version: 1.4.3
+        version: 1.4.4
       lefthook:
         specifier: ^2.0.0
         version: 2.2.2
@@ -298,8 +298,8 @@ packages:
     resolution: {integrity: sha512-GsCw/qu92GI0EX6s7fxUi/SG1lmFjG9XZivxxEDZXqztuQKCn5o5wKdz4v005zci0Md7EZzgAwmQLoIEDZoaow==}
     engines: {node: '>=22'}
 
-  '@rendobar/sdk@5.14.0':
-    resolution: {integrity: sha512-H0c+S/lkTE+BdeWVL21MmxCAylhfS9+IuOu1ESYb7PvRDa7WGzEJd3rBvi0gN/LXK0fPKqGuDAdOelZsBytQnQ==}
+  '@rendobar/sdk@5.15.0':
+    resolution: {integrity: sha512-soR6FB/eDNhZY/NwK3GhaadsZaHUkfk3orxEH9RJc8S94oaLEVkE9S2CZClvnJBxtkQq14zPJvdp0Y50sWaqUQ==}
     engines: {node: '>=18'}
 
   '@simple-libs/child-process-utils@2.0.0':
@@ -310,8 +310,8 @@ packages:
     resolution: {integrity: sha512-fCTuZK4QBa+39Oz9l4OGfJfz+GpwCp3AqO7Zch3to99xHPgstVsRFpeQ8LNd2o1Gv8raL2mCFwiaHh7bFSp5DQ==}
     engines: {node: '>=22'}
 
-  '@types/bun@1.4.3':
-    resolution: {integrity: sha512-N67Pqy8JXbAY/j0tNraS3V5mubGvc6rrrNDmDCtZLlFzccbUJPDb0tvgUBC5q4m8ybkP93Jcn1QB+RYQ6PvBhw==}
+  '@types/bun@1.4.4':
+    resolution: {integrity: sha512-9wkRDXUXK124pEnAutE6n/l18j+i9GC5IAHK8TmX/2nlySETmky0OU6yL5U8pW1AoKh++AN9auDCr647BfurjQ==}
 
   '@types/node@25.9.1':
     resolution: {integrity: sha512-xfrlY7UD5rMJk3ZVJP8BNzS28J36YJg+xp+LPXV1TdWxr8uMH5A860QNxYDGQe/ylDSgjxE52Q9VnO7p75tJxg==}
@@ -454,8 +454,8 @@ packages:
     resolution: {integrity: sha512-DhBpBfXL4SS2uC0N922MMajKR3CdrTG0u2or1PNYgXMsrSzViJrbtvT0nCLlLGUI0plam/ZZCs7aAauHtW9thw==}
     engines: {node: '>=22'}
 
-  bun-types@1.4.3:
-    resolution: {integrity: sha512-tinRJNGOmUN+tEAsn2y2e942n9JHRHR42iUYzDH75NmhJqVBokGSQkkfSFdNWwsANIdrK6ACH9t01M452YyTwg==}
+  bun-types@1.4.4:
+    resolution: {integrity: sha512-yjrJh5oGX7mMPKGd19YXyIjmEuj4G4zNC30bs7PM9Az7NQ3ndF3j6hbeRdvJTRQEhJ/FYQwW0a2moweEi2hMxQ==}
 
   callsites@3.1.0:
     resolution: {integrity: sha512-P8BjAsXvZS+VIDUI11hHCQEv74YT67YUi5JJFNWIqL235sBmjX4+qx9Muvls5ivyNENctx46xQLQ3aTuE7ssaQ==}
@@ -849,7 +849,7 @@ snapshots:
 
   '@conventional-changelog/template@1.3.0': {}
 
-  '@rendobar/sdk@5.14.0':
+  '@rendobar/sdk@5.15.0':
     dependencies:
       partysocket: 1.3.0
     transitivePeerDependencies:
@@ -861,9 +861,9 @@ snapshots:
 
   '@simple-libs/stream-utils@2.0.0': {}
 
-  '@types/bun@1.4.3':
+  '@types/bun@1.4.4':
     dependencies:
-      bun-types: 1.4.3
+      bun-types: 1.4.4
 
   '@types/node@25.9.1':
     dependencies:
@@ -944,7 +944,7 @@ snapshots:
 
   argue-cli@3.1.0: {}
 
-  bun-types@1.4.3:
+  bun-types@1.4.4:
     dependencies:
       '@types/node': 25.9.1
       undici-types: 7.24.6
